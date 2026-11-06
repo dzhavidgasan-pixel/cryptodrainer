@@ -46,7 +46,7 @@ class Settings(BaseSettings):
         default=True,
         alias="GIFT_REQUIRE_SELLER_USERNAME",
     )
-    gift_ru_only: bool = Field(default=True, alias="GIFT_RU_ONLY")
+    gift_ru_only: bool = Field(default=False, alias="GIFT_RU_ONLY")
     gift_ru_min_score: int = Field(default=2, alias="GIFT_RU_MIN_SCORE")
     gift_allowed_languages_raw: str = Field(default="ru,en,ar,zh", alias="GIFT_ALLOWED_LANGUAGES")
     gift_listing_compact_message: bool = Field(

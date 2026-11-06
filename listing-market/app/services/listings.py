@@ -369,9 +369,6 @@ async def poll_tracker_group(
                 seller_name=tg_seller_name,
             )
             listing = await _enrich_seller_profile(settings, cipher, account_sessions, listing)
-            if settings.gift_ru_only and listing.ru_score < settings.gift_ru_min_score:
-                logger.info("Skip non-RU listing %s with score %s", listing.listing_key, listing.ru_score)
-                continue
             msg_reject = _messages_mode_reject_reason(listing, group)
             if msg_reject is not None:
                 logger.info("[group %s] Skip listing %s by messages filter: %s", group_id, listing.listing_key, msg_reject)
@@ -708,17 +705,7 @@ def _passes_group_filters(listing: GiftListingData, settings: Settings, group: T
     """Настройки самого парсера этой группы (не категорийные тумблеры "Фильтры" —
     те решают, В КАКОЙ ТОПИК слать, а это решает, слать ли вообще). Возвращает None,
     если листинг проходит, иначе — причину отказа."""
-    # Жёсткие фильтры-отсекатели (не выбор топика, а «слать ли вообще»). Раньше они
-    # жили в _topic_ids_for_group и потому обходились персональными топиками подарков
-    # (gift_topics добавлялись в _send_group_listing уже ПОСЛЕ этой функции) — из-за
-    # этого в per-gift топик прилетали лоты с уровнем/кол-вом подарков выше лимита.
-    # Держим их здесь, чтобы гейтить всю отправку целиком, включая per-gift топики.
-    if (
-        group.filter_max_gifts_count
-        and listing.gifts_count is not None
-        and listing.gifts_count > group.filter_max_gifts_count
-    ):
-        return f"gifts_count={listing.gifts_count} > max_gifts={group.filter_max_gifts_count}"
+    # Жёсткие фильтры-отсекатели (не выбор топика, а «слать ли вообще»).
     if _price_tier(listing, settings, group) == "toohigh":
         return "price_tier=toohigh (floor выше vip_max)"
 
@@ -845,15 +832,6 @@ def _topic_ids_for_group(listing: GiftListingData, settings: Settings, group: Tr
     None означает «без топика» (обычное сообщение в чат, только если вообще ничего не подошло).
     """
     topics: list[int | None] = []
-
-    # Фильтр "не больше N подарков на профиле": если у продавца известно число
-    # подарков и оно превышает лимит группы — не публикуем вообще (0 = без лимита).
-    if (
-        group.filter_max_gifts_count
-        and listing.gifts_count is not None
-        and listing.gifts_count > group.filter_max_gifts_count
-    ):
-        return []
 
     tier = _price_tier(listing, settings, group)
     if tier == "toohigh":
