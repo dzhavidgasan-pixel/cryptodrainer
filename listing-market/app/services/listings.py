@@ -285,18 +285,6 @@ async def poll_tracker_group(
                 logger.info("[group %s] Skip listing %s — no slug for see.tg", group_id, listing.listing_key)
                 continue
             tg_seller_name = (listing.seller_name or "").strip() or None
-            if not tg_seller_name and listing.seller_id:
-                tg_seller_name = await _resolve_display_name_by_seller_id(
-                    settings, cipher, account_sessions, int(listing.seller_id)
-                )
-                if tg_seller_name:
-                    logger.info(
-                        "[group %s] Listing %s — seller name from userbot id %s: %r",
-                        group_id,
-                        listing.listing_key,
-                        listing.seller_id,
-                        tg_seller_name,
-                    )
 
             listing = replace(listing, seller_username=None)
             from app.services import seetg as seetg_api
@@ -319,15 +307,50 @@ async def poll_tracker_group(
                 )
                 continue
 
+            see_tid = owner.get("telegram_id")
+            if see_tid is not None:
+                see_tid = int(see_tid)
+                if listing.seller_id is None:
+                    listing = replace(listing, seller_id=see_tid)
+                    logger.info(
+                        "[group %s] Listing %s — seller_id from see.tg listing event: %s",
+                        group_id,
+                        listing.listing_key,
+                        see_tid,
+                    )
+                elif int(listing.seller_id) != see_tid:
+                    logger.info(
+                        "[group %s] Skip listing %s — seller_id TG %s != see.tg %s (slug %s)",
+                        group_id,
+                        listing.listing_key,
+                        listing.seller_id,
+                        see_tid,
+                        listing.slug,
+                    )
+                    continue
+
             see_seller_name = (owner.get("name") or "").strip() or None
-            if not see_seller_name:
+            if not see_seller_name or see_seller_name == "-":
                 logger.info(
-                    "[group %s] Skip listing %s — no seller name in see.tg listing event (slug %s)",
+                    "[group %s] Skip listing %s — no valid seller name in see.tg listing (slug %s)",
                     group_id,
                     listing.listing_key,
                     listing.slug,
                 )
                 continue
+
+            if not tg_seller_name and listing.seller_id:
+                tg_seller_name = await _resolve_display_name_by_seller_id(
+                    settings, cipher, account_sessions, int(listing.seller_id)
+                )
+                if tg_seller_name:
+                    logger.info(
+                        "[group %s] Listing %s — seller name from userbot id %s: %r",
+                        group_id,
+                        listing.listing_key,
+                        listing.seller_id,
+                        tg_seller_name,
+                    )
 
             if not tg_seller_name:
                 tg_seller_name = see_seller_name

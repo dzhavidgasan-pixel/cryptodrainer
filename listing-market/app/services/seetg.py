@@ -455,8 +455,8 @@ def _owner_from_history(result: dict) -> dict | None:
     return None
 
 
-def _listing_owner_name_from_history(result: dict) -> str | None:
-    """Имя продавца из события listing в history (в т.ч. hidden без @)."""
+def _listing_event_owner_raw(result: dict) -> dict | None:
+    """owner из giftAction listing: имя, @ и telegramId (id нужен, когда маркет скрывает продавца)."""
     items = result.get("items") if isinstance(result, dict) else None
     if not isinstance(items, list):
         return None
@@ -469,28 +469,15 @@ def _listing_owner_name_from_history(result: dict) -> str | None:
         gift = ga.get("gift") if isinstance(ga.get("gift"), dict) else {}
         owner = gift.get("owner") if isinstance(gift, dict) else None
         if isinstance(owner, dict):
-            name = (owner.get("name") or "").strip()
-            if name:
-                return name
-    return None
-
-
-def _owner_from_listing_event(result: dict) -> dict | None:
-    """Владелец из события action==listing (имя + @ если see.tg отдал)."""
-    items = result.get("items") if isinstance(result, dict) else None
-    if not isinstance(items, list):
-        return None
-    for item in items:
-        if not isinstance(item, dict):
-            continue
-        ga = item.get("giftAction") or {}
-        if ga.get("action") != "listing":
-            continue
-        gift = ga.get("gift") if isinstance(ga.get("gift"), dict) else {}
-        owner = _telegram_party(gift.get("owner"))
-        if owner:
             return owner
     return None
+
+
+def _valid_listing_seller_name(name: str | None) -> bool:
+    if not name:
+        return False
+    s = name.strip()
+    return bool(s) and s != "-"
 
 
 def _merge_listing_owner_name(owner: dict, history_name: str | None) -> dict:
@@ -558,13 +545,25 @@ async def gift_listing_owner(settings: Settings, slug: str) -> dict | None | obj
     res = await _get(settings, path)
     if res is _TRANSIENT:
         return _TRANSIENT
-    history_name = _listing_owner_name_from_history(res) if isinstance(res, dict) else None
-    if not history_name:
+    raw = _listing_event_owner_raw(res) if isinstance(res, dict) else None
+    if not isinstance(raw, dict):
+        logger.info("see.tg %s: нет события listing", slug)
+        return None
+
+    history_name = (raw.get("name") or "").strip()
+    if not _valid_listing_seller_name(history_name):
         logger.info("see.tg %s: нет имени в событии listing", slug)
         return None
-    owner = _owner_from_listing_event(res) if isinstance(res, dict) else None
-    if owner and owner.get("username"):
-        merged = _merge_listing_owner_name(owner, history_name)
+
+    tid = raw.get("telegramId")
+    telegram_id: int | None = int(tid) if tid is not None else None
+    username = (raw.get("username") or "").lstrip("@") or None
+
+    if username:
+        party = _telegram_party(raw)
+        if not party:
+            return {"username": None, "name": history_name, "telegram_id": telegram_id}
+        merged = _merge_listing_owner_name(party, history_name)
         see_name = (merged.get("name") or "").strip()
         if see_name and not seller_display_names_equal(history_name, see_name):
             logger.info(
@@ -575,8 +574,11 @@ async def gift_listing_owner(settings: Settings, slug: str) -> dict | None | obj
                 see_name,
             )
             return None
-        return merged
-    return {"username": None, "name": history_name, "telegram_id": None}
+        out = dict(merged)
+        if telegram_id is not None:
+            out["telegram_id"] = telegram_id
+        return out
+    return {"username": None, "name": history_name, "telegram_id": telegram_id}
 
 
 async def maybe_notify_seetg_limit(bot, settings: Settings, reason: str, slug: str) -> None:
