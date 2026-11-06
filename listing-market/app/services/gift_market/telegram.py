@@ -767,20 +767,26 @@ class TelegramGiftMarketClient:
             paid_stars = getattr(user_obj, "send_paid_messages_stars", None)
             can_write_free = not bool(paid_stars)
             contact_price_stars = paid_stars or None
+        else:
+            # У resale Telegram часто скрывает PeerUser (owner_id=None), но оставляет owner_name.
+            raw_owner_name = getattr(item, "owner_name", None)
+            if isinstance(raw_owner_name, str):
+                stripped = raw_owner_name.strip()
+                if stripped:
+                    seller_name = stripped
 
         seller_last_seen: str | None = None
         if user_obj is not None:
             seller_last_seen = _seller_last_seen_label(getattr(user_obj, "status", None), self._settings.tzinfo)
 
-        name_text = " ".join(
-            part
-            for part in (
-                getattr(user_obj, "first_name", None) if user_obj else None,
-                getattr(user_obj, "last_name", None) if user_obj else None,
-                seller_username,
-            )
-            if part
-        )
+        name_text_parts: list[str | None] = [
+            getattr(user_obj, "first_name", None) if user_obj else None,
+            getattr(user_obj, "last_name", None) if user_obj else None,
+            seller_username,
+        ]
+        if user_obj is None and seller_name:
+            name_text_parts.append(seller_name)
+        name_text = " ".join(part for part in name_text_parts if part)
         ru_score, ru_reasons = _score_languages(
             name_text, seller_lang_code, self._settings.gift_allowed_languages
         )
