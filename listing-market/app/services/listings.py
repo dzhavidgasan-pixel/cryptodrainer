@@ -298,15 +298,6 @@ async def poll_tracker_group(
                         tg_seller_name,
                     )
 
-            if not tg_seller_name:
-                logger.info(
-                    "[group %s] Skip listing %s — no seller display name from Telegram/userbot (slug %s)",
-                    group_id,
-                    listing.listing_key,
-                    listing.slug,
-                )
-                continue
-
             listing = replace(listing, seller_username=None)
             from app.services import seetg as seetg_api
 
@@ -315,48 +306,87 @@ async def poll_tracker_group(
             if see_transient:
                 owner = None
 
-            if not isinstance(owner, dict) or not owner.get("username"):
+            if not isinstance(owner, dict):
                 if see_transient:
                     await seetg_api.maybe_notify_seetg_limit(
                         bot, settings, "see.tg лимит/402", listing.slug
                     )
-                logger.info("[group %s] Skip listing %s — no seller username from see.tg", group_id, listing.listing_key)
+                logger.info(
+                    "[group %s] Skip listing %s — no see.tg listing owner data (slug %s)",
+                    group_id,
+                    listing.listing_key,
+                    listing.slug,
+                )
                 continue
 
-            username = str(owner["username"]).lstrip("@")
+            see_seller_name = (owner.get("name") or "").strip() or None
+            if not see_seller_name:
+                logger.info(
+                    "[group %s] Skip listing %s — no seller name in see.tg listing event (slug %s)",
+                    group_id,
+                    listing.listing_key,
+                    listing.slug,
+                )
+                continue
+
+            if not tg_seller_name:
+                tg_seller_name = see_seller_name
+                logger.info(
+                    "[group %s] Listing %s — using see.tg listing name (no TG display name yet): %r",
+                    group_id,
+                    listing.listing_key,
+                    tg_seller_name,
+                )
+            elif not _seller_names_match_telegram_and_seetg(tg_seller_name, see_seller_name):
+                logger.info(
+                    "[group %s] Skip listing %s — seller name mismatch TG=%r see.tg listing=%r (slug %s)",
+                    group_id,
+                    listing.listing_key,
+                    tg_seller_name,
+                    see_seller_name,
+                    listing.slug,
+                )
+                continue
+
+            if not listing.seller_id:
+                logger.info(
+                    "[group %s] Skip listing %s — no seller_id for userbot @ (slug %s)",
+                    group_id,
+                    listing.listing_key,
+                    listing.slug,
+                )
+                continue
+
+            username = await _resolve_username_by_seller_id(
+                settings, cipher, account_sessions, int(listing.seller_id)
+            )
+            if not username:
+                logger.info(
+                    "[group %s] Skip listing %s — no @ from userbot for seller id %s (slug %s)",
+                    group_id,
+                    listing.listing_key,
+                    listing.seller_id,
+                    listing.slug,
+                )
+                continue
+            username = username.lstrip("@")
             if username.lower() in {"giftstoportals", "giftstomarket", "mrktbank", "portal"}:
                 logger.info(
-                    "[group %s] Skip listing %s — see.tg @ is market account (%s)",
+                    "[group %s] Skip listing %s — userbot @ is market account (%s)",
                     group_id,
                     listing.listing_key,
                     username,
                 )
                 continue
 
-            if listing.seller_id:
-                id_username = await _resolve_username_by_seller_id(
-                    settings, cipher, account_sessions, int(listing.seller_id)
-                )
-                if id_username and id_username.lower() != username.lower():
-                    logger.info(
-                        "[group %s] Skip listing %s — see.tg @%s != userbot @%s for seller id %s (slug %s)",
-                        group_id,
-                        listing.listing_key,
-                        username,
-                        id_username,
-                        listing.seller_id,
-                        listing.slug,
-                    )
-                    continue
-
-            see_seller_name = (owner.get("name") or "").strip() or None
-            if not _seller_names_match_telegram_and_seetg(tg_seller_name, see_seller_name):
+            see_username = (owner.get("username") or "").lstrip("@") or None
+            if see_username and see_username.lower() != username.lower():
                 logger.info(
-                    "[group %s] Skip listing %s — seller name mismatch TG=%r see.tg=%r (slug %s)",
+                    "[group %s] Skip listing %s — see.tg listing @%s != userbot @%s (slug %s)",
                     group_id,
                     listing.listing_key,
-                    tg_seller_name,
-                    see_seller_name,
+                    see_username,
+                    username,
                     listing.slug,
                 )
                 continue

@@ -35,9 +35,9 @@ class Settings(BaseSettings):
 
     star_to_ton_rate: float = Field(default=0.004, alias="STAR_TO_TON_RATE")
     gift_poll_interval_seconds: int = Field(default=10, alias="GIFT_POLL_INTERVAL_SECONDS")
-    gift_resale_limit_per_gift: int = Field(default=2, alias="GIFT_RESALE_LIMIT_PER_GIFT")
-    gift_base_limit: int = Field(default=60, alias="GIFT_BASE_LIMIT")
-    gift_max_listings_per_poll: int = Field(default=1, alias="GIFT_MAX_LISTINGS_PER_POLL")
+    gift_resale_limit_per_gift: int = Field(default=25, alias="GIFT_RESALE_LIMIT_PER_GIFT")
+    gift_base_limit: int = Field(default=80, alias="GIFT_BASE_LIMIT")
+    gift_max_listings_per_poll: int = Field(default=35, alias="GIFT_MAX_LISTINGS_PER_POLL")
     gift_check_contact_requirements: bool = Field(
         default=False,
         alias="GIFT_CHECK_CONTACT_REQUIREMENTS",
@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     gift_ru_min_score: int = Field(default=2, alias="GIFT_RU_MIN_SCORE")
     gift_allowed_languages_raw: str = Field(default="ru,en,ar,zh", alias="GIFT_ALLOWED_LANGUAGES")
     gift_listing_compact_message: bool = Field(
-        default=False,
+        default=True,
         alias="GIFT_LISTING_COMPACT_MESSAGE",
         description="Короткий текст поста листинга (цена, флор, модель, время) без профиля продавца",
     )

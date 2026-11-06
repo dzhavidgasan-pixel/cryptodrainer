@@ -448,8 +448,8 @@ class TelegramGiftMarketClient:
                 contact_price_stars=cached.contact_price_stars,
                 ru_score=cached.ru_score,
                 ru_reasons=cached.ru_reasons,
-                level=cached.level,
-                gifts_count=cached.gifts_count,
+                level=None,
+                gifts_count=None,
                 seller_last_seen=cached.seller_last_seen,
                 is_female_seller=cached.is_female_seller,
                 is_china_seller=cached.is_china_seller,
@@ -472,12 +472,6 @@ class TelegramGiftMarketClient:
                     live = await self._check_contact_requirement(client, ent)
                     if live is not None:
                         can_write_free, contact_price_stars = live
-                try:
-                    level = await self._fetch_user_level(client, ent)
-                except Exception as exc:
-                    logger.warning("Cannot fetch seller level for @%s: %s", listing.seller_username, exc)
-                    level = listing.level
-                gifts_count = await self._fetch_seller_gifts_count(client, ent)
                 name_text = " ".join(
                     part
                     for part in (
@@ -490,8 +484,12 @@ class TelegramGiftMarketClient:
                 ru_score, ru_reasons = _score_languages(
                     name_text, lang, self._settings.gift_allowed_languages
                 )
-                seller_last_seen = _seller_last_seen_label(
-                    getattr(ent, "status", None), self._settings.tzinfo
+                seller_last_seen = (
+                    None
+                    if self._settings.gift_listing_compact_message
+                    else _seller_last_seen_label(
+                        getattr(ent, "status", None), self._settings.tzinfo
+                    )
                 )
                 out = replace(
                     listing,
@@ -503,8 +501,8 @@ class TelegramGiftMarketClient:
                     contact_price_stars=contact_price_stars,
                     ru_score=ru_score,
                     ru_reasons=ru_reasons,
-                    level=level,
-                    gifts_count=gifts_count,
+                    level=None,
+                    gifts_count=None,
                     seller_last_seen=seller_last_seen,
                     is_female_seller=is_female_seller(seller_name, listing.seller_username),
                     is_china_seller=is_china_seller(seller_name, listing.seller_username, lang),
@@ -847,23 +845,14 @@ class TelegramGiftMarketClient:
             if live is not None:
                 can_write_free, contact_price_stars = live
 
-        seller_level: int | None = None
-        gifts_count: int | None = None
-        if user_obj is not None:
-            try:
-                seller_level = await self._fetch_user_level(client, user_obj)
-            except Exception as exc:
-                logger.warning("Cannot fetch seller level for %s: %s", getattr(user_obj, "id", "?"), exc)
-            gifts_count = await self._fetch_seller_gifts_count(client, user_obj)
-
         return replace(
             stub,
             floor_price_stars=floor_price_stars,
             floor_price_ton=floor_price_ton,
             can_write_free=can_write_free,
             contact_price_stars=contact_price_stars,
-            level=seller_level,
-            gifts_count=gifts_count,
+            level=None,
+            gifts_count=None,
         )
 
     async def _fetch_seller_gifts_count(self, client: TelegramClient, user_obj: Any) -> int | None:
