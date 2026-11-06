@@ -34,6 +34,8 @@ logger = logging.getLogger(__name__)
 
 # Публичный @ в строке see.tg (в т.ч. «twzxy @user» или «Name @rubup»)
 _SEE_NAME_AT_RE = re.compile(r"@([A-Za-z0-9_]{4,32})\b")
+# Иногда см.тг кладёт в name только юзернейм без @ (латиница/цифры/underscore)
+_SEE_NAME_AS_USERNAME_RE = re.compile(r"^[A-Za-z0-9_]{4,32}$")
 
 # Максимум на работу с одной MTProto-сессией за один опрос. Без этого тайм-аута
 # сетевой сбой (плохое соединение, зависший ответ Telegram-DC и т.п.) на ОДНОЙ
@@ -346,6 +348,13 @@ async def poll_tracker_group(
             username_in_see_name = at_matches[-1] if at_matches else None
             see_username_field = (owner.get("username") or "").lstrip("@") or None
             see_name_for_compare = _SEE_NAME_AT_RE.sub("", see_seller_name).strip()
+
+            if (
+                listing.seller_id is None
+                and not username_in_see_name
+                and _SEE_NAME_AS_USERNAME_RE.match(see_seller_name.strip())
+            ):
+                username_in_see_name = see_seller_name.strip()
 
             if listing.seller_id is None and username_in_see_name:
                 rid = await _resolve_seller_id_by_username(
