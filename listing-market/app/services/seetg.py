@@ -480,6 +480,23 @@ def _valid_listing_seller_name(name: str | None) -> bool:
     return bool(s) and s != "-"
 
 
+def _owner_telegram_id(owner: dict | None) -> int | None:
+    """see.tg в разных ответах может назвать id по-разному; иногда — во вложенном user."""
+    if not isinstance(owner, dict):
+        return None
+    for key in ("telegramId", "telegram_id", "userId", "user_id", "id"):
+        v = owner.get(key)
+        if v is not None and not isinstance(v, dict):
+            try:
+                return int(v)
+            except (TypeError, ValueError):
+                pass
+    nested = owner.get("user")
+    if isinstance(nested, dict):
+        return _owner_telegram_id(nested)
+    return None
+
+
 def _merge_listing_owner_name(owner: dict, history_name: str | None) -> dict:
     if not history_name:
         return owner
@@ -555,9 +572,10 @@ async def gift_listing_owner(settings: Settings, slug: str) -> dict | None | obj
         logger.info("see.tg %s: нет имени в событии listing", slug)
         return None
 
-    tid = raw.get("telegramId")
-    telegram_id: int | None = int(tid) if tid is not None else None
+    telegram_id = _owner_telegram_id(raw)
     username = (raw.get("username") or "").lstrip("@") or None
+    if not username and isinstance(raw.get("user"), dict):
+        username = (raw["user"].get("username") or "").lstrip("@") or None
 
     if username:
         party = _telegram_party(raw)
