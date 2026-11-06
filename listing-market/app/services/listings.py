@@ -719,12 +719,6 @@ def _passes_group_filters(listing: GiftListingData, settings: Settings, group: T
         and listing.gifts_count > group.filter_max_gifts_count
     ):
         return f"gifts_count={listing.gifts_count} > max_gifts={group.filter_max_gifts_count}"
-    if (
-        group.filter_max_level
-        and listing.level is not None
-        and listing.level > group.filter_max_level
-    ):
-        return f"level={listing.level} > max_level={group.filter_max_level}"
     if _price_tier(listing, settings, group) == "toohigh":
         return "price_tier=toohigh (floor выше vip_max)"
 
@@ -858,16 +852,6 @@ def _topic_ids_for_group(listing: GiftListingData, settings: Settings, group: Tr
         group.filter_max_gifts_count
         and listing.gifts_count is not None
         and listing.gifts_count > group.filter_max_gifts_count
-    ):
-        return []
-
-    # Фильтр по уровню (Stars level) продавца: не слать тех, у кого уровень выше
-    # заданного (0 = без ограничения). Просили покупатели — крупные владельцы с
-    # высоким уровнем им не нужны.
-    if (
-        group.filter_max_level
-        and listing.level is not None
-        and listing.level > group.filter_max_level
     ):
         return []
 
