@@ -735,6 +735,28 @@ class TelegramGiftMarketClient:
             if channel_obj is not None:
                 seller_username = getattr(channel_obj, "username", None)
                 seller_name = getattr(channel_obj, "title", None)
+        elif isinstance(owner, dict):
+            # Редко owner_id приходит как dict (например, после сериализации в to_dict).
+            uid = owner.get("user_id")
+            cid = owner.get("channel_id")
+            if uid is not None:
+                try:
+                    seller_id = int(uid)
+                except (TypeError, ValueError):
+                    seller_id = None
+                else:
+                    user_obj = users_by_id.get(seller_id)
+            elif cid is not None:
+                try:
+                    seller_id = int(cid)
+                except (TypeError, ValueError):
+                    seller_id = None
+                else:
+                    seller_is_channel = True
+                    channel_obj = chats_by_id.get(seller_id)
+                    if channel_obj is not None:
+                        seller_username = getattr(channel_obj, "username", None)
+                        seller_name = getattr(channel_obj, "title", None)
 
         if user_obj is not None:
             seller_username = getattr(user_obj, "username", None) or _first_active_username(user_obj)
