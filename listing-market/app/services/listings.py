@@ -1,6 +1,7 @@
 import asyncio
 import html
 import logging
+import re
 from dataclasses import dataclass, replace
 from datetime import datetime
 
@@ -30,6 +31,8 @@ from app.services.gift_market.telegram import GiftListingData, TelegramGiftMarke
 from app.services.settings import get_setting, global_listing_paused
 
 logger = logging.getLogger(__name__)
+
+_SEE_NAME_AT_RE = re.compile(r"@([A-Za-z][A-Za-z0-9_]{3,31})\b")
 
 # Максимум на работу с одной MTProto-сессией за один опрос. Без этого тайм-аута
 # сетевой сбой (плохое соединение, зависший ответ Telegram-DC и т.п.) на ОДНОЙ
@@ -284,7 +287,6 @@ async def poll_tracker_group(
             if not listing.slug:
                 logger.info("[group %s] Skip listing %s — no slug for see.tg", group_id, listing.listing_key)
                 continue
-            tg_seller_name = (listing.seller_name or "").strip() or None
 
             listing = replace(listing, seller_username=None)
             from app.services import seetg as seetg_api
@@ -339,7 +341,36 @@ async def poll_tracker_group(
                 )
                 continue
 
-            if not tg_seller_name and listing.seller_id:
+            at_matches = _SEE_NAME_AT_RE.findall(see_seller_name)
+            username_in_see_name = at_matches[-1] if at_matches else None
+            see_username_field = (owner.get("username") or "").lstrip("@") or None
+            see_name_for_compare = _SEE_NAME_AT_RE.sub("", see_seller_name).strip()
+
+            if listing.seller_id is None and username_in_see_name:
+                rid = await _resolve_seller_id_by_username(
+                    settings, cipher, account_sessions, username_in_see_name
+                )
+                if rid is not None:
+                    listing = replace(listing, seller_id=rid)
+                    logger.info(
+                        "[group %s] Listing %s — seller_id from @ in see.tg name → %s (@%s)",
+                        group_id,
+                        listing.listing_key,
+                        rid,
+                        username_in_see_name,
+                    )
+
+            if not listing.seller_id:
+                logger.info(
+                    "[group %s] Skip listing %s — no seller_id (see.tg has no telegramId, slug %s)",
+                    group_id,
+                    listing.listing_key,
+                    listing.slug,
+                )
+                continue
+
+            tg_seller_name = (listing.seller_name or "").strip() or None
+            if not tg_seller_name:
                 tg_seller_name = await _resolve_display_name_by_seller_id(
                     settings, cipher, account_sessions, int(listing.seller_id)
                 )
@@ -352,33 +383,29 @@ async def poll_tracker_group(
                         tg_seller_name,
                     )
 
-            if not tg_seller_name:
+            if tg_seller_name:
+                tg_cmp = tg_seller_name.strip()
+                if (
+                    see_name_for_compare
+                    and not _seller_names_match_telegram_and_seetg(tg_cmp, see_name_for_compare)
+                ):
+                    logger.info(
+                        "[group %s] Skip listing %s — seller name mismatch TG=%r vs see.tg (no @mentions) %r (slug %s)",
+                        group_id,
+                        listing.listing_key,
+                        tg_cmp,
+                        see_name_for_compare,
+                        listing.slug,
+                    )
+                    continue
+            else:
                 tg_seller_name = see_seller_name
                 logger.info(
-                    "[group %s] Listing %s — using see.tg listing name (no TG display name yet): %r",
+                    "[group %s] Listing %s — using see.tg listing name (userbot has no display name): %r",
                     group_id,
                     listing.listing_key,
                     tg_seller_name,
                 )
-            elif not _seller_names_match_telegram_and_seetg(tg_seller_name, see_seller_name):
-                logger.info(
-                    "[group %s] Skip listing %s — seller name mismatch TG=%r see.tg listing=%r (slug %s)",
-                    group_id,
-                    listing.listing_key,
-                    tg_seller_name,
-                    see_seller_name,
-                    listing.slug,
-                )
-                continue
-
-            if not listing.seller_id:
-                logger.info(
-                    "[group %s] Skip listing %s — no seller_id for userbot @ (slug %s)",
-                    group_id,
-                    listing.listing_key,
-                    listing.slug,
-                )
-                continue
 
             username = await _resolve_username_by_seller_id(
                 settings, cipher, account_sessions, int(listing.seller_id)
@@ -402,19 +429,29 @@ async def poll_tracker_group(
                 )
                 continue
 
-            see_username = (owner.get("username") or "").lstrip("@") or None
-            if see_username and see_username.lower() != username.lower():
+            if see_username_field and see_username_field.lower() != username.lower():
                 logger.info(
                     "[group %s] Skip listing %s — see.tg listing @%s != userbot @%s (slug %s)",
                     group_id,
                     listing.listing_key,
-                    see_username,
+                    see_username_field,
                     username,
                     listing.slug,
                 )
                 continue
+            if not see_username_field and username_in_see_name:
+                if username_in_see_name.lower() != username.lower():
+                    logger.info(
+                        "[group %s] Skip listing %s — @ in see name @%s != userbot @%s (slug %s)",
+                        group_id,
+                        listing.listing_key,
+                        username_in_see_name,
+                        username,
+                        listing.slug,
+                    )
+                    continue
 
-            seller_id = owner.get("telegram_id") or listing.seller_id
+            seller_id = int(listing.seller_id)
             listing = replace(
                 listing,
                 seller_username=username,
@@ -732,6 +769,35 @@ async def _resolve_username_by_seller_id(
             logger.warning("Username lookup session #%s: %s", account_session.id, exc)
     _seller_username_cache[seller_id] = out
     return out
+
+
+async def _resolve_seller_id_by_username(
+    settings: Settings,
+    cipher: SessionCipher,
+    account_sessions: list[AccountSession],
+    username: str,
+) -> int | None:
+    """Числовой id по @ — когда see.tg не даёт telegramId, а @ есть в имени."""
+    un = username.lstrip("@")
+    if not un:
+        return None
+    for account_session in account_sessions:
+        try:
+            session_string = cipher.decrypt(account_session.session_ciphertext)
+            client = TelegramGiftMarketClient(settings, session_string)
+            async with client._connected_client() as tg:
+                ent = await tg.get_entity(un)
+                uid = getattr(ent, "id", None)
+                if uid is not None:
+                    return int(uid)
+        except Exception as exc:
+            logger.warning(
+                "Resolve seller id session #%s @%s: %s",
+                account_session.id,
+                un,
+                exc,
+            )
+    return None
 
 
 async def _enrich_seller_profile(
