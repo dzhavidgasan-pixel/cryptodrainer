@@ -32,7 +32,8 @@ from app.services.settings import get_setting, global_listing_paused
 
 logger = logging.getLogger(__name__)
 
-_SEE_NAME_AT_RE = re.compile(r"@([A-Za-z][A-Za-z0-9_]{3,31})\b")
+# Публичный @ в строке see.tg (в т.ч. «twzxy @user» или «Name @rubup»)
+_SEE_NAME_AT_RE = re.compile(r"@([A-Za-z0-9_]{4,32})\b")
 
 # Максимум на работу с одной MTProto-сессией за один опрос. Без этого тайм-аута
 # сетевой сбой (плохое соединение, зависший ответ Telegram-DC и т.п.) на ОДНОЙ
