@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { config } from "./config.js";
+import { logError } from "./log.js";
 import { writeStartMediaMeta } from "./media.js";
 import { sendMessage } from "./telegram.js";
 
@@ -75,8 +76,21 @@ export async function handleInboxMessage(
   else if (caption.match(/guide[_\s]?3/)) name = "guide_step_3.jpg";
   else if (caption.match(/guide[_\s]?4/)) name = "guide_step_4.jpg";
 
-  const saved = await saveTelegramFile(fileId, name);
-  if (!saved) return;
+  let saved: string | null = null;
+  try {
+    saved = await saveTelegramFile(fileId, name);
+  } catch (e) {
+    await logError("media_inbox_download", e, { file_id: fileId, name, caption });
+    return;
+  }
+  if (!saved) {
+    await logError("media_inbox_download", new Error("getFile/save returned null"), {
+      file_id: fileId,
+      name,
+      caption,
+    });
+    return;
+  }
 
   const root = path.resolve(inbox, "..");
   if (name === "start.mp4" || name === "start.gif") {

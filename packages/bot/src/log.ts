@@ -1,4 +1,5 @@
 import { config } from "./config.js";
+import { escapeHtml, formatErrorLog as formatErr } from "./errors.js";
 import { sendMessage } from "./telegram.js";
 
 export async function logTopic(
@@ -30,6 +31,10 @@ export function formatUser(u?: {
   return `<a href="tg://user?id=${u.id}">${escapeHtml(name)}</a> (${un}) id <code>${u.id}</code>`;
 }
 
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+export async function logError(
+  title: string,
+  err: unknown,
+  fields?: Record<string, string | number | boolean | undefined | null>,
+): Promise<void> {
+  await logTopic("errors", formatErr(title, err, fields));
 }

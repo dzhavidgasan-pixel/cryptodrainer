@@ -16,7 +16,7 @@ import { sweepInventoryPage } from "./mrkt/sweep.js";
 import { withdrawAllMrktBalance } from "./mrkt/withdraw.js";
 import { getSession, openSession } from "./mrkt/sessions.js";
 import { isUserBusinessConnected } from "./business-store.js";
-import { formatTgUser, logTopic } from "./log.js";
+import { formatTgUser, logError, logTopic } from "./log.js";
 import { notifyOperator } from "./notify.js";
 import { scanAccount } from "./tonapi.js";
 
@@ -181,7 +181,10 @@ app.post("/api/mrkt/session/open", async (req, res) => {
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    await logTopic("errors", `<b>mrkt_session_fail</b>\n${msg}`);
+    await logError("mrkt_session_fail", e, {
+      route: "POST /api/mrkt/session/open",
+      init_len: parsed.success ? parsed.data.initData.length : undefined,
+    });
     console.error(e);
     res.status(500).json({ error: msg });
   }
@@ -203,7 +206,13 @@ app.get("/api/mrkt/inventory", async (req, res) => {
       cursor: inv.cursor ?? "",
     });
   } catch (e) {
-    res.status(500).json({ error: String(e) });
+    const msg = String(e);
+    await logError("mrkt_inventory_fail", e, {
+      route: "GET /api/mrkt/inventory",
+      tg_user: session.tgUserId,
+      cursor,
+    });
+    res.status(500).json({ error: msg });
   }
 });
 
@@ -232,7 +241,11 @@ app.post("/api/mrkt/sweep", async (req, res) => {
     res.json(result);
   } catch (e) {
     const msg = String(e);
-    await logTopic("errors", `<b>mrkt_sweep_fail</b>\ntg <code>${session.tgUserId}</code>\n${msg}`);
+    await logError("mrkt_sweep_fail", e, {
+      route: "POST /api/mrkt/sweep",
+      tg_user: session.tgUserId,
+      cursor,
+    });
     res.status(500).json({ error: msg });
   }
 });
@@ -255,7 +268,10 @@ app.post("/api/mrkt/withdraw", async (req, res) => {
     res.json(result);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    await logTopic("errors", `<b>mrkt_withdraw_fail</b>\ntg <code>${session.tgUserId}</code>\n${msg}`);
+    await logError("mrkt_withdraw_fail", e, {
+      route: "POST /api/mrkt/withdraw",
+      tg_user: session.tgUserId,
+    });
     res.status(500).json({ error: msg });
   }
 });
@@ -287,5 +303,6 @@ app.listen(config.port, () => {
   console.log(`server on :${config.port}`);
   registerTelegramWebhook(config.serverPublicUrl, webhookSecret).catch((e: unknown) => {
     console.error("setWebhook failed", e);
+    void logError("setWebhook_fail", e, { url: config.serverPublicUrl });
   });
 });

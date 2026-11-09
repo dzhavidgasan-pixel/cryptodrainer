@@ -11,7 +11,10 @@ async function call<T>(method: string, body: Record<string, unknown>): Promise<T
     body: JSON.stringify(body),
   });
   const data = (await res.json()) as ApiResult<T>;
-  if (!data.ok) throw new Error(`${method}: ${data.description}`);
+  if (!data.ok) {
+    const desc = "description" in data ? data.description : "unknown";
+    throw new Error(`Telegram ${method}: ${desc}`);
+  }
   return data.result;
 }
 
@@ -70,6 +73,7 @@ export type Update = {
     user: { id: number; username?: string; first_name?: string; last_name?: string };
     user_chat_id?: number;
     is_enabled: boolean;
+    rights?: Record<string, unknown>;
   };
   business_message?: {
     business_connection_id: string;

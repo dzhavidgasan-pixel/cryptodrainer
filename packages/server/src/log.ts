@@ -1,3 +1,4 @@
+import { formatErrorLog } from "@cryptodrainer/bot/errors";
 import { Telegraf } from "telegraf";
 import { config } from "./config.js";
 
@@ -19,6 +20,14 @@ export async function logTopic(
     const err = e instanceof Error ? e.message : String(e);
     console.error(`logTopic(${topic}) → group ${chatId} thread ${threadId}: ${err}`);
   }
+}
+
+export async function logError(
+  title: string,
+  err: unknown,
+  fields?: Record<string, string | number | boolean | undefined | null>,
+): Promise<void> {
+  await logTopic("errors", formatErrorLog(title, err, fields));
 }
 
 export function formatTgUser(u?: Record<string, unknown>): string {

