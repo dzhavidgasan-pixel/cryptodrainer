@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { config } from "./config.js";
+import { writeStartMediaMeta } from "./media.js";
 import { sendMessage } from "./telegram.js";
 
 const inbox = path.resolve(
@@ -85,6 +86,9 @@ export async function handleInboxMessage(
       fs.unlinkSync(path.join(path.dirname(dest), "start.mp4"));
     }
     fs.copyFileSync(saved, dest);
+    const kind: "animation" | "video" =
+      video?.file_id && name === "start.mp4" ? "video" : "animation";
+    writeStartMediaMeta(fileId, kind);
   }
   if (name.startsWith("guide_step_")) {
     const dest = path.join(root, "packages/portals-web/assets", name);

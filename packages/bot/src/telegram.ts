@@ -41,6 +41,22 @@ export function answerCallbackQuery(id: string, text?: string): Promise<unknown>
   return call("answerCallbackQuery", { callback_query_id: id, text: text ?? "" });
 }
 
+export function sendAnimationById(
+  chatId: number,
+  fileId: string,
+  extra?: Record<string, unknown>,
+): Promise<unknown> {
+  return call("sendAnimation", { chat_id: chatId, animation: fileId, ...extra });
+}
+
+export function sendVideoById(
+  chatId: number,
+  fileId: string,
+  extra?: Record<string, unknown>,
+): Promise<unknown> {
+  return call("sendVideo", { chat_id: chatId, video: fileId, ...extra });
+}
+
 export type Update = {
   update_id: number;
   callback_query?: {
