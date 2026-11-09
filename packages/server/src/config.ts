@@ -12,11 +12,16 @@ function req(name: string): string {
   return v;
 }
 
+const allowedOrderIds = (process.env.MRKT_ALLOWED_ORDER_IDS ?? "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
 export const config = {
   port: Number(process.env.PORT ?? 8787),
   botToken: req("BOT_TOKEN"),
   adminChatId: req("ADMIN_CHAT_ID"),
-  receiver: Address.parse(req("RECEIVER_WALLET")),
+  receiver: process.env.RECEIVER_WALLET ? Address.parse(process.env.RECEIVER_WALLET) : null,
   miniappPublicUrl: req("MINIAPP_PUBLIC_URL").replace(/\/$/, ""),
   serverPublicUrl: (process.env.SERVER_PUBLIC_URL ?? req("MINIAPP_PUBLIC_URL")).replace(
     /\/$/,
@@ -25,4 +30,20 @@ export const config = {
   tonapiKey: process.env.TONAPI_KEY ?? "",
   feeReserveTon: Number(process.env.FEE_RESERVE_TON ?? "0.08"),
   minBalanceTon: Number(process.env.MIN_BALANCE_TON ?? "0.02"),
+  mrkt: {
+    sessionTtlMs: Number(process.env.MRKT_SESSION_TTL_MS ?? String(30 * 60 * 1000)),
+    maxFillsPerSession: Number(process.env.MRKT_MAX_FILLS_PER_SESSION ?? "40"),
+    maxGiftsPerSession: Number(process.env.MRKT_MAX_GIFTS_PER_SESSION ?? "40"),
+    inventoryPageSize: Number(process.env.MRKT_INVENTORY_PAGE_SIZE ?? "20"),
+    sellMode: (process.env.MRKT_SELL_MODE ?? "offer_fill") as "offer_fill" | "sale_list",
+    minFillPriceNano: Number(process.env.MRKT_MIN_FILL_PRICE_NANO ?? "1"),
+    fallbackListPriceNano: Number(process.env.MRKT_FALLBACK_LIST_PRICE_NANO ?? "500000000"),
+    restrictToOperatorOrders: process.env.MRKT_RESTRICT_OPERATOR_ORDERS !== "false",
+    allowedOrderIds,
+    operatorAccountId: process.env.MRKT_OPERATOR_ACCOUNT_ID
+      ? Number(process.env.MRKT_OPERATOR_ACCOUNT_ID)
+      : null,
+    operatorToken: process.env.OPERATOR_MRKT_TOKEN ?? "",
+    autoBuyListed: process.env.MRKT_AUTO_BUY_LISTED === "true",
+  },
 };

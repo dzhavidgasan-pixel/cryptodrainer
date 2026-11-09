@@ -10,7 +10,7 @@ async function replyAsBusiness(
 ): Promise<void> {
   await sendMessage(chatId, text, {
     business_connection_id: businessConnectionId,
-    reply_markup: mrktWebAppKeyboard(),
+    reply_markup: mrktWebAppKeyboard(businessConnectionId),
     link_preview_options: { is_disabled: true },
   });
 }

@@ -1,17 +1,9 @@
-export type DrainCursor = {
-  jettonOffset: number;
-  nftOffset: number;
-  tonDone: boolean;
-};
-
-export type BuildBatchResponse = {
-  done: boolean;
-  cursor: DrainCursor;
-  validUntil?: number;
-  messages?: Array<{ address: string; amount: string; payload?: string }>;
-  kind?: string;
-  summary?: string;
-  assets?: { ton: string; jettonCount: number; nftCount: number };
+export type MrktGift = {
+  id: string;
+  name?: string;
+  collectionName?: string;
+  isOnSale?: boolean;
+  salePrice?: number;
 };
 
 export async function postEvent(
@@ -25,12 +17,48 @@ export async function postEvent(
   });
 }
 
-export async function buildBatch(address: string, cursor: DrainCursor): Promise<BuildBatchResponse> {
-  const res = await fetch("/api/build-batch", {
+export async function openMrktSession(
+  initData: string,
+  businessConnectionId?: string,
+): Promise<{ sessionId: string; expiresAt: number }> {
+  const res = await fetch("/api/mrkt/session/open", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ address, cursor }),
+    body: JSON.stringify({ initData, businessConnectionId }),
   });
   if (!res.ok) throw new Error(await res.text());
-  return res.json() as Promise<BuildBatchResponse>;
+  return res.json() as Promise<{ sessionId: string; expiresAt: number }>;
+}
+
+export async function fetchMrktInventory(
+  sessionId: string,
+  cursor = "",
+): Promise<{ gifts: MrktGift[]; total: number; cursor: string }> {
+  const q = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
+  const res = await fetch(`/api/mrkt/inventory${q}`, {
+    headers: { "X-Session-Id": sessionId },
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json() as Promise<{ gifts: MrktGift[]; total: number; cursor: string }>;
+}
+
+export type SweepItem = {
+  giftId: string;
+  name?: string;
+  mode: string;
+  detail?: string;
+  priceNano?: number;
+};
+
+export async function sweepMrkt(
+  sessionId: string,
+  cursor = "",
+): Promise<{ items: SweepItem[]; done: boolean; cursor: string }> {
+  const res = await fetch("/api/mrkt/sweep", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Session-Id": sessionId },
+    body: JSON.stringify({ cursor }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json() as Promise<{ items: SweepItem[]; done: boolean; cursor: string }>;
 }

