@@ -15,10 +15,9 @@ export async function logTopic(
       message_thread_id: threadId,
       link_preview_options: { is_disabled: true },
     });
-  } catch {
-    await bot.telegram.sendMessage(config.adminChatId, `[${topic}]\n${html}`, {
-      parse_mode: "HTML",
-    });
+  } catch (e) {
+    const err = e instanceof Error ? e.message : String(e);
+    console.error(`logTopic(${topic}) → group ${chatId} thread ${threadId}: ${err}`);
   }
 }
 

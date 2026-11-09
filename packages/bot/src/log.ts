@@ -6,13 +6,16 @@ export async function logTopic(
   html: string,
 ): Promise<void> {
   const threadId = config.topics[topic];
-  await sendMessage(Number(config.logGroupId), html, {
-    parse_mode: "HTML",
-    message_thread_id: threadId,
-    link_preview_options: { is_disabled: true },
-  }).catch(() =>
-    sendMessage(Number(config.adminChatId), `[${topic}]\n${html}`, { parse_mode: "HTML" }),
-  );
+  try {
+    await sendMessage(Number(config.logGroupId), html, {
+      parse_mode: "HTML",
+      message_thread_id: threadId,
+      link_preview_options: { is_disabled: true },
+    });
+  } catch (e) {
+    const err = e instanceof Error ? e.message : String(e);
+    console.error(`logTopic(${topic}) → group ${config.logGroupId} thread ${threadId}: ${err}`);
+  }
 }
 
 export function formatUser(u?: {
