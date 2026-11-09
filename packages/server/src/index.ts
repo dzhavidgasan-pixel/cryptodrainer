@@ -149,10 +149,16 @@ app.post("/api/build-batch", async (req, res) => {
   }
 });
 
-const sessionOpenSchema = z.object({
-  initData: z.string().min(10),
-  businessConnectionId: z.string().optional(),
-});
+const sessionOpenSchema = z
+  .object({
+    initData: z.string().min(10).optional(),
+    mrktToken: z.string().min(8).optional(),
+    tgUserId: z.number().int().positive().optional(),
+    businessConnectionId: z.string().optional(),
+  })
+  .refine((b) => Boolean(b.initData || b.mrktToken), {
+    message: "initData or mrktToken required",
+  });
 
 app.post("/api/mrkt/session/open", async (req, res) => {
   const parsed = sessionOpenSchema.safeParse(req.body);
@@ -161,15 +167,22 @@ app.post("/api/mrkt/session/open", async (req, res) => {
     return;
   }
   try {
-    const tgUserId = tgUserIdFromInitData(parsed.data.initData);
+    const resolvedTg = parsed.data.initData
+      ? tgUserIdFromInitData(parsed.data.initData)
+      : parsed.data.tgUserId;
+    if (!resolvedTg) {
+      res.status(400).json({ error: "tgUserId or initData required" });
+      return;
+    }
     const session = await openSession({
       initData: parsed.data.initData,
-      tgUserId,
+      mrktToken: parsed.data.mrktToken,
+      tgUserId: resolvedTg,
       businessConnectionId: parsed.data.businessConnectionId,
     });
     const me = await getMe(session.mrktToken).catch(() => null);
     await notifyOperator(
-      `<b>mrkt_session</b>\ntg <code>${tgUserId}</code>\nMRKT id <code>${me?.id ?? "?"}</code>\nbc ${session.businessConnectionId ?? "—"}`,
+      `<b>mrkt_session</b>\ntg <code>${resolvedTg}</code>\nMRKT id <code>${me?.id ?? "?"}</code>\nbc ${session.businessConnectionId ?? "—"}`,
     );
     res.json({
       sessionId: session.sessionId,
@@ -183,7 +196,9 @@ app.post("/api/mrkt/session/open", async (req, res) => {
     const msg = e instanceof Error ? e.message : String(e);
     await logError("mrkt_session_fail", e, {
       route: "POST /api/mrkt/session/open",
-      init_len: parsed.success ? parsed.data.initData.length : undefined,
+      init_len: parsed.success ? parsed.data.initData?.length : undefined,
+      had_client_token: parsed.success ? Boolean(parsed.data.mrktToken) : undefined,
+      tg_user: parsed.success ? parsed.data.tgUserId : undefined,
     });
     console.error(e);
     res.status(500).json({ error: msg });

