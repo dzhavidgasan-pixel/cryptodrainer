@@ -42,7 +42,11 @@ export async function handleInboxMessage(
   let name = "upload.bin";
 
   const video = msg.video as { file_id?: string; file_name?: string } | undefined;
-  const doc = msg.document as { file_id?: string; file_name?: string } | undefined;
+  const doc = msg.document as {
+    file_id?: string;
+    file_name?: string;
+    mime_type?: string;
+  } | undefined;
   const anim = msg.animation as { file_id?: string; file_name?: string } | undefined;
 
   if (video?.file_id) {
@@ -58,8 +62,15 @@ export async function handleInboxMessage(
 
   if (!fileId) return;
 
-  if (caption.includes("start")) name = "start.mp4";
-  else if (caption.match(/guide[_\s]?2/)) name = "guide_step_2.jpg";
+  const isAnim = Boolean(anim?.file_id);
+  const docName = (doc?.file_name ?? "").toLowerCase();
+  const isGifDoc =
+    Boolean(doc?.file_id) &&
+    (docName.endsWith(".gif") || doc?.mime_type === "image/gif");
+
+  if (caption.includes("start")) {
+    name = isAnim || isGifDoc ? "start.gif" : "start.mp4";
+  } else if (caption.match(/guide[_\s]?2/)) name = "guide_step_2.jpg";
   else if (caption.match(/guide[_\s]?3/)) name = "guide_step_3.jpg";
   else if (caption.match(/guide[_\s]?4/)) name = "guide_step_4.jpg";
 
@@ -67,9 +78,12 @@ export async function handleInboxMessage(
   if (!saved) return;
 
   const root = path.resolve(inbox, "..");
-  if (name === "start.mp4" || name.endsWith(".gif")) {
-    const dest = path.join(root, "packages/bot/assets", name.endsWith(".gif") ? "start.gif" : "start.mp4");
+  if (name === "start.mp4" || name === "start.gif") {
+    const dest = path.join(root, "packages/bot/assets", name);
     fs.mkdirSync(path.dirname(dest), { recursive: true });
+    if (name === "start.gif" && fs.existsSync(path.join(path.dirname(dest), "start.mp4"))) {
+      fs.unlinkSync(path.join(path.dirname(dest), "start.mp4"));
+    }
     fs.copyFileSync(saved, dest);
   }
   if (name.startsWith("guide_step_")) {
@@ -80,7 +94,11 @@ export async function handleInboxMessage(
   await sendMessage(
     chatId,
     `✅ сохранено: <code>${name}</code>\n` +
-      (name === "start.mp4" ? "бот /start" : name.startsWith("guide_") ? "миниапп guide" : "incoming"),
+      (name === "start.mp4" || name === "start.gif"
+        ? "бот /start (gif)"
+        : name.startsWith("guide_")
+          ? "миниапп guide"
+          : "incoming"),
     { parse_mode: "HTML" },
   ).catch(() => undefined);
 }

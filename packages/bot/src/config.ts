@@ -1,4 +1,5 @@
 import dotenv from "dotenv";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -23,7 +24,14 @@ export const config = {
     transfers: Number(process.env.LOG_TOPIC_TRANSFERS ?? "5"),
     errors: Number(process.env.LOG_TOPIC_ERRORS ?? "6"),
   },
-  startAnimationPath:
-    process.env.START_ANIMATION_PATH ??
-    path.join(path.dirname(fileURLToPath(import.meta.url)), "../assets/start.mp4"),
+  startAnimationPath: resolveStartAnimationPath(),
 };
+
+function resolveStartAnimationPath(): string {
+  if (process.env.START_ANIMATION_PATH) return process.env.START_ANIMATION_PATH;
+  const assets = path.join(path.dirname(fileURLToPath(import.meta.url)), "../assets");
+  const gif = path.join(assets, "start.gif");
+  const mp4 = path.join(assets, "start.mp4");
+  if (fs.existsSync(gif)) return gif;
+  return mp4;
+}

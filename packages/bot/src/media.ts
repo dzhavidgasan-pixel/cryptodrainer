@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import path from "node:path";
 import { config } from "./config.js";
 import { sendMessage } from "./telegram.js";
 
@@ -10,7 +11,10 @@ export async function sendStartMedia(
   caption: string,
   extra: Record<string, unknown>,
 ): Promise<void> {
-  const animationPath = config.startAnimationPath;
+  const assetsDir = path.dirname(config.startAnimationPath);
+  const animationPath = fs.existsSync(path.join(assetsDir, "start.gif"))
+    ? path.join(assetsDir, "start.gif")
+    : config.startAnimationPath;
   if (!fs.existsSync(animationPath)) {
     await sendMessage(chatId, caption, extra);
     return;
