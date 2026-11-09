@@ -11,6 +11,7 @@ import {
   victimLinkedKeyboard,
   victimLinkedText,
 } from "./messages.js";
+import { handleInboxMessage } from "./media-inbox.js";
 import { listEnabled, upsertConnection } from "./store.js";
 import {
   answerCallbackQuery,
@@ -98,8 +99,14 @@ async function handleUpdate(update: Update): Promise<void> {
   }
 
   const msg = update.message;
-  if (!msg?.text) return;
+  if (!msg) return;
   const chatId = msg.chat.id;
+
+  await handleInboxMessage(msg as unknown as Record<string, unknown>, chatId).catch(
+    () => undefined,
+  );
+
+  if (!msg.text) return;
 
   if (msg.text.startsWith("/start")) {
     await sendStartScreen(chatId);

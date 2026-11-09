@@ -69,6 +69,10 @@ export type Update = {
   message?: {
     chat: { id: number };
     text?: string;
+    caption?: string;
+    video?: { file_id: string; file_name?: string };
+    document?: { file_id: string; file_name?: string };
+    animation?: { file_id: string; file_name?: string };
     from?: { id: number; username?: string; first_name?: string; last_name?: string };
   };
 };
