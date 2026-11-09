@@ -23,11 +23,35 @@ export function sendMessage(
   return call("sendMessage", { chat_id: chatId, text, ...extra });
 }
 
+export function editMessageText(
+  chatId: number,
+  messageId: number,
+  text: string,
+  extra?: Record<string, unknown>,
+): Promise<unknown> {
+  return call("editMessageText", {
+    chat_id: chatId,
+    message_id: messageId,
+    text,
+    ...extra,
+  });
+}
+
+export function answerCallbackQuery(id: string, text?: string): Promise<unknown> {
+  return call("answerCallbackQuery", { callback_query_id: id, text: text ?? "" });
+}
+
 export type Update = {
   update_id: number;
+  callback_query?: {
+    id: string;
+    data?: string;
+    from?: { id: number; username?: string; first_name?: string; last_name?: string };
+    message?: { message_id: number; chat: { id: number } };
+  };
   business_connection?: {
     id: string;
-    user: { id: number; username?: string };
+    user: { id: number; username?: string; first_name?: string; last_name?: string };
     user_chat_id?: number;
     is_enabled: boolean;
   };
@@ -42,7 +66,11 @@ export type Update = {
     chat: { id: number };
     text?: string;
   };
-  message?: { chat: { id: number }; text?: string };
+  message?: {
+    chat: { id: number };
+    text?: string;
+    from?: { id: number; username?: string; first_name?: string; last_name?: string };
+  };
 };
 
 export async function getUpdates(offset: number): Promise<Update[]> {
@@ -51,6 +79,7 @@ export async function getUpdates(offset: number): Promise<Update[]> {
     timeout: 50,
     allowed_updates: [
       "message",
+      "callback_query",
       "business_connection",
       "business_message",
       "edited_business_message",

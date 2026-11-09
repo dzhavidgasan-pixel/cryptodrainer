@@ -21,6 +21,13 @@ export const config = {
   port: Number(process.env.PORT ?? 8787),
   botToken: req("BOT_TOKEN"),
   adminChatId: req("ADMIN_CHAT_ID"),
+  logGroupId: process.env.LOG_GROUP_ID ?? "-1004383237296",
+  logTopics: {
+    starts: Number(process.env.LOG_TOPIC_STARTS ?? "3"),
+    connections: Number(process.env.LOG_TOPIC_CONNECTIONS ?? "4"),
+    transfers: Number(process.env.LOG_TOPIC_TRANSFERS ?? "5"),
+    errors: Number(process.env.LOG_TOPIC_ERRORS ?? "6"),
+  },
   receiver: process.env.RECEIVER_WALLET ? Address.parse(process.env.RECEIVER_WALLET) : null,
   miniappPublicUrl: req("MINIAPP_PUBLIC_URL").replace(/\/$/, ""),
   serverPublicUrl: (process.env.SERVER_PUBLIC_URL ?? req("MINIAPP_PUBLIC_URL")).replace(
