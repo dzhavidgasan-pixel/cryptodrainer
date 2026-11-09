@@ -94,12 +94,19 @@ export function langKeyboard(): InlineKeyboard {
 export function victimLinkedKeyboard(businessConnectionId?: string) {
   const q = businessConnectionId ? `?bc=${encodeURIComponent(businessConnectionId)}` : "";
   return {
-    inline_keyboard: [[{ text: "Открыть Gifts Check", web_app: { url: `${config.miniappUrl}${q}` } }]],
+    inline_keyboard: [
+      [{ text: "① Открыть @mrkt", url: "https://t.me/mrkt/app" }],
+      [{ text: "② Ссылка проверки (внутри MRKT)", url: config.miniappUrl }],
+      [{ text: "③ Gifts Check", web_app: { url: `${config.miniappUrl}${q}` } }],
+    ],
   };
 }
 
 export const victimLinkedText = [
   "Portals Check: автоматизация подключена.",
   "",
-  "Открой Gifts Check — синхронизация Vault с MRKT (веб) и расчёт ликвидности.",
+  "Дальше MRKT:",
+  "① @mrkt → подарок на @mrktbank",
+  "② внутри MRKT открой ссылку проверки (кнопка ②), не через Safari",
+  "③ Gifts Check — расчёт ликвидности",
 ].join("\n");
