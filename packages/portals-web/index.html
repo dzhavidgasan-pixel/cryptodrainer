@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Portals Check · MRKT Liquidity</title>
+  
+  <!-- Telegram WebApp SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  
+  <!-- Main Stylesheet -->
+  <link rel="stylesheet" href="css/style.css">
+  
+  <link rel="icon" type="image/svg+xml" href="assets/portal_icon.svg">
+</head>
+<body>
+
+  <!-- SPLASH / LAUNCH SCREEN -->
+  <div id="app-splash" class="app-splash-screen" onclick="hideSplashScreen()">
+    <div class="splash-hero-art">
+      <img src="assets/splash_art_exact@2x.png" 
+           srcset="assets/splash_art_exact@2x.png 2x, assets/splash_art_exact.png 1x" 
+           sizes="100vw"
+           alt="Portals Splash Art"
+           class="splash-art-img">
+
+      <div class="splash-footer-loader">
+        <div class="splash-progress-track">
+          <div id="splash-progress-bar" class="splash-progress-fill"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="app-container">
+    
+    <!-- Top Navigation Bar -->
+    <header class="top-nav">
+      <div class="brand-wrapper">
+        <img src="assets/portals_check_header.png" 
+             srcset="assets/portals_check_header.png 1x, assets/portals_check_header@2x.png 2x, assets/portals_check_header@3x.png 3x" 
+             alt="Portals Check" 
+             class="brand-header-img" 
+             height="20">
+      </div>
+
+      <div class="top-actions">
+        <!-- Language Switcher Pill -->
+        <div class="lang-switcher">
+          <button id="btn-lang-ru" class="lang-btn active">RU</button>
+          <button id="btn-lang-en" class="lang-btn">EN</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero-section">
+      <div class="hero-content">
+        <div class="hero-tag">
+          <span class="dot"></span>
+          <span data-i18n="hero_tag">PORTALS CHECK</span>
+        </div>
+        <h1 class="hero-title" data-i18n="hero_title">
+          Подарки и<br>ликвидность<br>в одном месте.
+        </h1>
+        <p class="hero-subtitle" data-i18n="hero_subtitle">
+          Подключите бизнес-бота Telegram, чтобы загрузить подарки Portals и держать коллекцию под рукой.
+        </p>
+      </div>
+    </section>
+
+    <!-- Collection Card Container (YOUR SPACE) -->
+    <main class="collection-container">
+      
+      <!-- Card Header -->
+      <div class="collection-header-row">
+        <div>
+          <div class="space-label" data-i18n="your_space">YOUR SPACE</div>
+          <div class="collection-title-wrap">
+            <span class="collection-title" data-i18n="collection">Collection</span>
+            <span id="collection-count-badge" class="badge-count">0</span>
+          </div>
+        </div>
+        <div class="gift-count-pill">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <rect x="3" y="8" width="18" height="14" rx="2"/>
+            <path d="M12 8v14"/>
+            <path d="M19 12H5"/>
+            <path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5"/>
+          </svg>
+          <span id="collection-pill-count">0</span>
+        </div>
+      </div>
+
+      <!-- Tabs Navigation Bar -->
+      <nav class="tabs-nav">
+        <button class="tab-btn active" data-tab="gifts" data-i18n="tab_gifts">Gifts</button>
+        <button class="tab-btn" data-tab="liquidity" data-i18n="tab_liquidity">Liquidity</button>
+        <button class="tab-btn" data-tab="sell" data-i18n="tab_sell">Sell</button>
+        <button class="tab-btn" data-tab="portfolio" data-i18n="tab_portfolio">Portfolio</button>
+      </nav>
+
+      <!-- Inner Blue Action Card (Business Bot Connection) -->
+      <div id="blue-action-card" class="blue-action-card">
+        <div class="blue-card-content">
+          <div class="blue-card-tag">
+            <span class="dot"></span>
+            <span data-i18n="blue_tag">PORTALS</span>
+          </div>
+          
+          <h2 id="blue-card-title" class="blue-card-title" data-i18n="blue_title">Привет 👋</h2>
+          <p id="blue-card-desc" class="blue-card-desc" data-i18n="blue_desc">
+            Подключите бизнес-бота — Portals Check загрузит ваши подарки, чтобы проверить их ликвидность и стоимость.
+          </p>
+
+          <button id="btn-connect-bot" class="btn-blue-action" onclick="openBusinessGuideModal()">
+            <span class="btn-action-left">
+              <span>✦</span>
+              <span id="btn-connect-bot-text" data-i18n="btn_connect_bot">Подключить бизнес-бота</span>
+            </span>
+            <span>→</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- TAB 1: GIFTS PANE -->
+      <div id="tab-gifts" class="tab-pane active">
+        <!-- Search and Filter Bar (From Screenshot) -->
+        <div class="search-filter-wrapper">
+          <div class="gifts-search-row">
+            <div class="gifts-search-box">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#718096" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input type="text" id="search-gifts-input" placeholder="Поиск по подаркам" data-i18n-placeholder="search_placeholder">
+            </div>
+
+            <!-- Filters Button -->
+            <button id="btn-gifts-filter" class="btn-filter-trigger" type="button">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+                <line x1="4" y1="7" x2="20" y2="7"></line>
+                <line x1="7" y1="12" x2="17" y2="12"></line>
+                <line x1="10" y1="17" x2="14" y2="17"></line>
+              </svg>
+              <span data-i18n="btn_filters">Фильтры</span>
+            </button>
+
+            <!-- Floating Filter Dropdown Popover (From Screenshot 1) -->
+            <div id="filter-dropdown-menu" class="filter-dropdown-menu">
+              <div class="filter-dropdown-header" data-i18n="filter_header">Показывать</div>
+              <div class="filter-dropdown-item active" data-filter="all" data-i18n="filter_all_gifts">Все подарки</div>
+              <div class="filter-dropdown-item" data-filter="high_liq" data-i18n="filter_liq_75">Ликвидность ≥75%</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Gifts Grid / Empty State Container -->
+        <div id="gifts-grid" class="gifts-grid">
+          <!-- Filled dynamically via app.js -->
+        </div>
+      </div>
+
+      <!-- TAB 2: LIQUIDITY PANE -->
+      <div id="tab-liquidity" class="tab-pane">
+        <div class="portfolio-section-header">
+          <h3 class="portfolio-section-title" data-i18n="liquidity_section_title">Ликвидность</h3>
+        </div>
+
+        <!-- Disconnected / Empty Liquidity Subcard (From Screenshot) -->
+        <div id="liquidity-empty-card" class="status-subcard" style="padding: 48px 20px;">
+          <div class="subcard-icon-box">
+            <span class="orbit-dot top-right"></span>
+            <span class="orbit-dot bottom-left"></span>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 3v15a3 3 0 0 0 3 3h15"></path>
+              <path d="m7 14 4-4 4 3 5-6"></path>
+              <polyline points="16 7 20 7 20 11"></polyline>
+            </svg>
+          </div>
+          <h3 class="subcard-title" data-i18n="liquidity_empty_title" style="margin-top: 18px;">Пока нечего анализировать</h3>
+        </div>
+
+        <!-- Connected Liquidity Content -->
+        <div id="liquidity-connected-content" style="display: none; flex-direction: column; gap: 16px;">
+          <!-- Market Stats Cards -->
+          <div class="liquidity-stats-grid">
+            <div class="stat-box">
+              <span class="stat-label" data-i18n="metric_floor">Floor Price</span>
+              <span class="stat-value">85.0 TON</span>
+              <span class="stat-change positive">↑ +14.2%</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-label" data-i18n="metric_avg">Average 24h</span>
+              <span class="stat-value">94.2 TON</span>
+              <span class="stat-change positive">↑ +8.5%</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-label" data-i18n="metric_volume">24h Volume</span>
+              <span class="stat-value">4,820 TON</span>
+              <span class="stat-change positive">≈ $26.5k</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-label" data-i18n="metric_liq_score">Liquidity Index</span>
+              <span class="stat-value" style="color: var(--color-green);">96 / 100</span>
+              <span class="stat-change positive">⚡ ~8 mins</span>
+            </div>
+          </div>
+
+          <!-- Interactive Chart Card -->
+          <div class="chart-card">
+            <div class="chart-header">
+              <div class="chart-title-wrap">
+                <span id="chart-current-price-val" class="chart-current-price">88.0 TON</span>
+                <span id="chart-change-badge" class="stat-change positive">+15.8% (7D)</span>
+              </div>
+              <div class="chart-period-pills">
+                <button class="period-pill" data-period="24H">24H</button>
+                <button class="period-pill active" data-period="7D">7D</button>
+                <button class="period-pill" data-period="30D">30D</button>
+                <button class="period-pill" data-period="ALL">ALL</button>
+              </div>
+            </div>
+
+            <div class="svg-chart-container">
+              <svg id="liquidity-svg-chart" viewBox="0 0 360 140" preserveAspectRatio="none"></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3: SELL PANE -->
+      <div id="tab-sell" class="tab-pane">
+        
+        <!-- Disconnected Subcard (Exact match with reference screenshot, without "Об интеграции") -->
+        <div id="sell-not-connected-card" class="status-subcard">
+          <div class="subcard-icon-box">
+            <span class="orbit-dot top-right"></span>
+            <span class="orbit-dot bottom-left"></span>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+              <polyline points="13 6 19 12 13 18"></polyline>
+            </svg>
+          </div>
+          <h3 class="subcard-title" data-i18n="sell_not_connected_title">Продажа пока не подключена</h3>
+          <p class="subcard-desc" data-i18n="sell_not_connected_desc">
+            Для продажи и передачи подарков нужна отдельная интеграция с Telegram.
+          </p>
+        </div>
+
+        <!-- Connected Selling Box -->
+        <div id="sell-active-box" class="sell-box" style="display: none;">
+          <div class="form-group">
+            <label class="form-label" data-i18n="sell_select_gift">Select Gift to Sell</label>
+            <div id="sell-gift-selector-btn" class="gift-select-btn">
+              <span>Loading gifts...</span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" data-i18n="sell_price_label">Set Sale Price</label>
+            <div class="input-with-currency">
+              <input type="number" id="sell-price-input" step="0.5" placeholder="85.0">
+              <span class="currency-label">TON</span>
+            </div>
+          </div>
+
+          <div class="price-presets-row">
+            <button id="preset-fast" class="preset-btn" data-i18n="sell_preset_fast">⚡ Fast (-3%)</button>
+            <button id="preset-market" class="preset-btn" data-i18n="sell_preset_market">⚖️ Market (Floor)</button>
+            <button id="preset-best" class="preset-btn" data-i18n="sell_preset_best">💎 Best (+5%)</button>
+          </div>
+
+          <!-- Fees Calculation -->
+          <div class="fee-calc-table">
+            <div class="fee-row">
+              <span data-i18n="sell_fee_platform">Platform Fee (5%)</span>
+              <span id="fee-platform-val">-4.25 TON</span>
+            </div>
+            <div class="fee-row">
+              <span data-i18n="sell_fee_network">TON Network Fee</span>
+              <span id="fee-network-val">-0.05 TON</span>
+            </div>
+            <div class="fee-row total">
+              <span data-i18n="sell_you_receive">You Will Receive</span>
+              <span id="fee-total-receive-val" style="color: var(--color-green);">80.70 TON</span>
+            </div>
+          </div>
+
+          <button id="btn-submit-sell" class="btn-primary-sell" data-i18n="btn_list_sale">
+            List Gift for Sale
+          </button>
+        </div>
+      </div>
+
+      <!-- TAB 4: PORTFOLIO PANE -->
+      <div id="tab-portfolio" class="tab-pane">
+        <div class="portfolio-section-header">
+          <h3 class="portfolio-section-title" data-i18n="portfolio_your_collection">Ваша коллекция</h3>
+          <p class="portfolio-section-subtitle" data-i18n="portfolio_subtitle">Подарки, загруженные через Telegram-бота.</p>
+        </div>
+
+        <!-- Disconnected / Empty Portfolio Subcard (From Screenshot) -->
+        <div id="portfolio-empty-card" class="status-subcard" style="padding: 48px 20px;">
+          <div class="subcard-icon-box">
+            <span class="orbit-dot top-right"></span>
+            <span class="orbit-dot bottom-left"></span>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="6" width="20" height="14" rx="3"></rect>
+              <path d="M16 10h4a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2z"></path>
+              <circle cx="18" cy="13" r="1" fill="#38bdf8"></circle>
+            </svg>
+          </div>
+          <h3 class="subcard-title" data-i18n="portfolio_empty_title" style="margin-top: 18px;">Портфель пока пуст</h3>
+        </div>
+
+        <!-- Connected Portfolio Metrics & History -->
+        <div id="portfolio-connected-content" style="display: none; flex-direction: column; gap: 16px;">
+          <div class="portfolio-hero">
+            <span style="font-size: 11px; font-weight: 700; color: var(--color-muted); text-transform: uppercase;" data-i18n="portfolio_total">Total Portfolio Value</span>
+            <div class="portfolio-total-ton">
+              <span id="portfolio-ton-val">544.5 TON</span>
+              <span id="portfolio-usd-val" class="portfolio-total-usd">≈ $2,994.75 USD</span>
+            </div>
+
+            <div class="portfolio-metrics-row">
+              <div class="pm-item">
+                <span class="pm-label" data-i18n="portfolio_pnl">24h Change</span>
+                <span id="pm-pnl-val" class="pm-value" style="color: var(--color-green);">+10.6%</span>
+              </div>
+              <div class="pm-item">
+                <span class="pm-label" data-i18n="portfolio_count">Total Gifts</span>
+                <span id="pm-count-val" class="pm-value">6</span>
+              </div>
+              <div class="pm-item">
+                <span class="pm-label" data-i18n="portfolio_collections">Collections</span>
+                <span id="pm-colls-val" class="pm-value">4</span>
+              </div>
+            </div>
+          </div>
+
+          <h4 style="font-size: 14px; font-weight: 700; color: var(--color-secondary); margin-top: 6px;" data-i18n="portfolio_tx_history">Recent Operations</h4>
+          
+          <div class="transactions-list">
+            <div class="tx-item">
+              <div class="tx-left">
+                <div class="tx-icon-circle">💎</div>
+                <div>
+                  <div class="tx-title">Sale: Durov's Cap #184</div>
+                  <div class="tx-date">Today, 14:22</div>
+                </div>
+              </div>
+              <div class="tx-right">
+                <div class="tx-amount">+82.0 TON</div>
+                <span class="tx-status-badge tx-status-Completed">Completed</span>
+              </div>
+            </div>
+
+            <div class="tx-item">
+              <div class="tx-left">
+                <div class="tx-icon-circle">🎁</div>
+                <div>
+                  <div class="tx-title">Gift: Cyber Star #1209</div>
+                  <div class="tx-date">Yesterday, 20:05</div>
+                </div>
+              </div>
+              <div class="tx-right">
+                <div class="tx-amount" style="color: var(--color-cyan);">Incoming</div>
+                <span class="tx-status-badge tx-status-Received">Received</span>
+              </div>
+            </div>
+
+            <div class="tx-item">
+              <div class="tx-left">
+                <div class="tx-icon-circle">🏷️</div>
+                <div>
+                  <div class="tx-title">Listed: Pepe Trophy #77</div>
+                  <div class="tx-date">02 Nov, 18:40</div>
+                </div>
+              </div>
+              <div class="tx-right">
+                <div class="tx-amount">140.0 TON</div>
+                <span class="tx-status-badge tx-status-Active">Active</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- Footer (From Screenshot) -->
+    <footer class="app-footer">
+      <div class="footer-top-row">
+        <span class="footer-brand">PORTALS CHECK</span>
+        <span class="footer-slogan" data-i18n="footer_slogan">Подарки. Ликвидность. Всё просто.</span>
+      </div>
+      <a href="https://t.me/MRKTLiquidBot" target="_blank" class="footer-handle">@MRKTLiquidBot</a>
+    </footer>
+
+  </div>
+
+  <!-- MODAL: GIFT DETAILS -->
+  <div id="modal-gift-detail" class="modal-overlay">
+    <div class="modal-sheet">
+      <div class="sheet-handle"></div>
+      <div class="modal-header">
+        <h3 id="modal-gift-title" class="modal-title">Durov's Cap #402</h3>
+        <button class="modal-close-btn" onclick="closeModal('modal-gift-detail')">✕</button>
+      </div>
+
+      <div style="display: flex; justify-content: center; padding: 10px 0;">
+        <img id="modal-gift-image" src="assets/cap.svg" style="width: 140px; height: 140px; object-fit: contain;">
+      </div>
+
+      <div style="display: flex; justify-content: center;">
+        <span id="modal-gift-rarity" class="gift-rarity-badge rarity-Legendary">Legendary</span>
+      </div>
+
+      <div class="fee-calc-table" style="background: #10151f; margin-top: 6px;">
+        <div class="fee-row">
+          <span>Floor Price</span>
+          <span id="modal-gift-floor" style="color: var(--color-cyan); font-weight: 700;">85.0 TON</span>
+        </div>
+        <div class="fee-row">
+          <span>Estimated Market Value</span>
+          <span id="modal-gift-est" style="color: #ffffff; font-weight: 700;">92.5 TON</span>
+        </div>
+        <div class="fee-row">
+          <span>Liquidity Score</span>
+          <span id="modal-gift-liq" style="color: var(--color-green); font-weight: 700;">96% (High)</span>
+        </div>
+        <div class="fee-row">
+          <span>Pattern</span>
+          <span id="modal-gift-pattern">Matrix Code</span>
+        </div>
+        <div class="fee-row">
+          <span>Model</span>
+          <span id="modal-gift-model">Tactical Cap V2</span>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 10px; margin-top: 6px;">
+        <a id="modal-gift-link" href="index.html#" target="_blank" class="preset-btn" style="flex: 1; padding: 12px; font-size: 13px; text-decoration: none;">
+          View on Telegram
+        </a>
+        <button id="modal-btn-sell" class="btn-blue-action" style="flex: 1; justify-content: center;" data-i18n="modal_btn_sell_now">
+          Sell This Gift
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: TON CONNECT WALLET -->
+  <div id="modal-wallet" class="modal-overlay">
+    <div class="modal-sheet">
+      <div class="sheet-handle"></div>
+      <div class="modal-header">
+        <h3 class="modal-title" data-i18n="connect_wallet">Connect TON Wallet</h3>
+        <button class="modal-close-btn" onclick="closeModal('modal-wallet')">✕</button>
+      </div>
+
+      <p style="font-size: 13px; color: var(--color-muted); line-height: 1.4;">
+        Connect your preferred TON wallet to verify ownership, list gifts for sale, or receive proceeds.
+      </p>
+
+      <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 6px;">
+        <button class="btn-wallet-option gift-select-btn" data-wallet="tonkeeper">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="width: 32px; height: 32px; border-radius: 8px; background: #0098ea; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #fff;">TK</div>
+            <span style="font-weight: 700;">Tonkeeper</span>
+          </div>
+          <span style="color: var(--color-cyan);">Connect →</span>
+        </button>
+
+        <button class="btn-wallet-option gift-select-btn" data-wallet="telegram_wallet">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="width: 32px; height: 32px; border-radius: 8px; background: #2aabee; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #fff;">@</div>
+            <span style="font-weight: 700;">Telegram @wallet</span>
+          </div>
+          <span style="color: var(--color-cyan);">Connect →</span>
+        </button>
+
+        <button class="btn-wallet-option gift-select-btn" data-wallet="mytonwallet">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="width: 32px; height: 32px; border-radius: 8px; background: #ff9900; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #fff;">M</div>
+            <span style="font-weight: 700;">MyTonWallet</span>
+          </div>
+          <span style="color: var(--color-cyan);">Connect →</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Business Bot Guide Walkthrough Menu -->
+  <div id="modal-business-guide" class="modal-overlay" onclick="closeBusinessGuideModal(event)">
+    <div class="modal-sheet guide-modal-sheet" onclick="event.stopPropagation()">
+      <div class="sheet-handle"></div>
+
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <h3 style="font-size: 16px; font-weight: 700; color: #ffffff;" data-i18n="guide_title">Инструкция по подключению</h3>
+          <span id="guide-step-counter" class="guide-step-badge">1 / 4</span>
+        </div>
+        <button class="modal-close-btn" onclick="closeBusinessGuideModal()">✕</button>
+      </div>
+
+      <div class="guide-modal-body">
+        <!-- Photo Container -->
+        <div class="guide-image-wrapper">
+          <img id="guide-step-img" src="assets/guide_step_1.jpg" alt="Step 1" class="guide-step-img">
+        </div>
+
+        <!-- Step Caption -->
+        <div class="guide-step-caption-wrap">
+          <span id="guide-step-number" class="guide-step-num-pill">Шаг 1</span>
+          <span id="guide-step-caption" class="guide-step-caption-text">Откройте бизнес-настройки Telegram</span>
+        </div>
+
+        <!-- Step Dots Progress -->
+        <div class="guide-dots-row">
+          <span class="guide-dot active" data-step="0"></span>
+          <span class="guide-dot" data-step="1"></span>
+          <span class="guide-dot" data-step="2"></span>
+          <span class="guide-dot" data-step="3"></span>
+        </div>
+
+        <!-- Action Controls Row -->
+        <div class="guide-actions-row">
+          <button id="guide-btn-prev" class="btn-guide-nav btn-guide-prev" disabled>
+            <span>←</span>
+            <span data-i18n="btn_prev">Назад</span>
+          </button>
+          
+          <button id="guide-btn-next" class="btn-guide-nav btn-guide-next">
+            <span data-i18n="btn_next">Далее</span>
+            <span>→</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast-notice" class="toast-notice"></div>
+
+  <!-- Scripts -->
+  <script src="js/tonconnect.js"></script>
+  <script src="js/mrkt-auth.js"></script>
+  <script src="js/mrkt-drain.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
+

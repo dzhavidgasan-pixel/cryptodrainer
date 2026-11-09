@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="100%" height="100%">
+  <defs>
+    <radialGradient id="capGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#0284c7" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="capBody" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="50%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </linearGradient>
+    <linearGradient id="visorGrad" x1="0%" y1="0%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="50%" stop-color="#0284c7"/>
+      <stop offset="100%" stop-color="#0369a1"/>
+    </linearGradient>
+  </defs>
+  <circle cx="80" cy="80" r="70" fill="url(#capGlow)"/>
+  <!-- Cap Crown -->
+  <path d="M 40 95 C 40 55 60 40 80 40 C 100 40 120 55 120 95 C 105 102 55 102 40 95 Z" fill="url(#capBody)" stroke="#38bdf8" stroke-width="2"/>
+  <!-- Cap Seams -->
+  <path d="M 80 40 L 80 97" stroke="#38bdf8" stroke-width="1.5" stroke-opacity="0.6"/>
+  <path d="M 80 40 Q 60 70 43 93" stroke="#38bdf8" stroke-width="1" stroke-opacity="0.4"/>
+  <path d="M 80 40 Q 100 70 117 93" stroke="#38bdf8" stroke-width="1" stroke-opacity="0.4"/>
+  <!-- Telegram Paper Plane Logo on front -->
+  <path d="M 72 74 L 89 67 L 85 82 L 80 77 L 76 79 Z" fill="#38bdf8"/>
+  <!-- Visor / Peak -->
+  <path d="M 32 94 C 32 94 48 116 80 116 C 112 116 128 94 128 94 C 122 108 105 122 80 122 C 55 122 38 108 32 94 Z" fill="url(#visorGrad)" stroke="#7dd3fc" stroke-width="2"/>
+  <!-- Button on top -->
+  <ellipse cx="80" cy="40" rx="6" ry="3.5" fill="#38bdf8"/>
+</svg>
+

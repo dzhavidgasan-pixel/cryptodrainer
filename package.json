@@ -1,0 +1,20 @@
+{
+  "name": "cryptodrainer",
+  "private": true,
+  "workspaces": [
+    "packages/bot",
+    "packages/server",
+    "packages/miniapp"
+  ],
+  "scripts": {
+    "build": "npm run build -w packages/bot && npm run build -w packages/server",
+    "dev:server": "npm run dev -w packages/server",
+    "dev:bot": "npm run dev -w packages/bot",
+    "dev:miniapp": "npm run dev -w packages/miniapp",
+    "start:server": "npm run start -w packages/server",
+    "start:bot": "npm run start -w packages/bot"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
