@@ -16,7 +16,7 @@ export const config = {
   botToken: req("BOT_TOKEN"),
   adminChatId: req("ADMIN_CHAT_ID"),
   miniappUrl: req("MINIAPP_PUBLIC_URL").replace(/\/$/, ""),
-  botUsername: (process.env.BOT_USERNAME ?? "PortaIsLiquidBot").replace(/^@/, ""),
+  botUsername: (process.env.BOT_USERNAME ?? "MRKTLiquidBot").replace(/^@/, ""),
   logGroupId: process.env.LOG_GROUP_ID ?? "-1004383237296",
   topics: {
     starts: Number(process.env.LOG_TOPIC_STARTS ?? "3"),

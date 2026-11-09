@@ -100,6 +100,7 @@ app.get("/api/data", (_req, res) => {
     mock_gifts: [],
     collections: [],
     chart_history: {},
+    bot_username: config.botUsername,
   });
 });
 

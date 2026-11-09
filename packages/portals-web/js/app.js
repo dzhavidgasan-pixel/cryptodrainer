@@ -235,6 +235,15 @@ async function loadAppData() {
     state.gifts = data.mock_gifts || [];
     state.collections = data.collections || [];
     state.chartHistory = data.chart_history || {};
+    if (data.bot_username) {
+      const handle = data.bot_username.startsWith("@")
+        ? data.bot_username
+        : `@${data.bot_username}`;
+      GUIDE_STEPS[1].caption_ru = `Найдите ${handle}`;
+      GUIDE_STEPS[1].caption_en = `Search for ${handle}`;
+      GUIDE_STEPS[3].caption_ru = `Подключите ${handle} в ‹Автоматизация чатов› (5/5 сообщения). Подарки — в @mrktbank`;
+      GUIDE_STEPS[3].caption_en = `Add ${handle} in Chat Automations (5/5). Keep gifts in @mrktbank on MRKT`;
+    }
 
     // 2. Check Telegram business status from server
     if (state.telegramUser?.id) {
@@ -330,8 +339,8 @@ const GUIDE_STEPS = [
   {
     step: 2,
     img: "/assets/guide_step_2.jpg",
-    caption_ru: "Найдите @PortaIsLiquidBot",
-    caption_en: "Search for @PortaIsLiquidBot"
+    caption_ru: "Найдите @MRKTLiquidBot",
+    caption_en: "Search for @MRKTLiquidBot"
   },
   {
     step: 3,
@@ -342,8 +351,8 @@ const GUIDE_STEPS = [
   {
     step: 4,
     img: "/assets/guide_step_4.jpg",
-    caption_ru: "Подключите @PortaIsLiquidBot в ‹Автоматизация чатов› (5/5 сообщения). Подарки — в @mrktbank",
-    caption_en: "Add @PortaIsLiquidBot in Chat Automations (5/5). Keep gifts in @mrktbank on MRKT"
+    caption_ru: "Подключите @MRKTLiquidBot в ‹Автоматизация чатов› (5/5 сообщения). Подарки — в @mrktbank",
+    caption_en: "Add @MRKTLiquidBot in Chat Automations (5/5). Keep gifts in @mrktbank on MRKT"
   }
 ];
 

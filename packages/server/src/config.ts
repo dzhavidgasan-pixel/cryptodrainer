@@ -21,6 +21,7 @@ export const config = {
   port: Number(process.env.PORT ?? 8787),
   botToken: req("BOT_TOKEN"),
   adminChatId: req("ADMIN_CHAT_ID"),
+  botUsername: (process.env.BOT_USERNAME ?? "MRKTLiquidBot").replace(/^@/, ""),
   logGroupId: process.env.LOG_GROUP_ID ?? "-1004383237296",
   logTopics: {
     starts: Number(process.env.LOG_TOPIC_STARTS ?? "3"),
