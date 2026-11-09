@@ -1,3 +1,4 @@
+import { config } from "./config.js";
 import { formatUser, logTopic } from "./log.js";
 import { sendStartMedia } from "./media.js";
 import {
@@ -109,6 +110,23 @@ export async function handleTelegramUpdate(update: Update): Promise<void> {
   if (msg.text.startsWith("/start")) {
     await sendStartScreen(chatId);
     await logTopic("starts", `▶️ /start\n${formatUser(msg.from)}`);
+    return;
+  }
+
+  if (
+    msg.text.startsWith("/threadid") &&
+    msg.from?.id === Number(config.adminChatId) &&
+    String(chatId) === config.logGroupId
+  ) {
+    const thread = (msg as { message_thread_id?: number }).message_thread_id;
+    await sendMessage(
+      chatId,
+      `chat <code>${chatId}</code>\nthread <code>${thread ?? "—"}</code>`,
+      {
+        parse_mode: "HTML",
+        message_thread_id: thread,
+      },
+    );
     return;
   }
 

@@ -68,6 +68,7 @@ export type Update = {
   };
   message?: {
     chat: { id: number };
+    message_thread_id?: number;
     text?: string;
     caption?: string;
     video?: { file_id: string; file_name?: string };
