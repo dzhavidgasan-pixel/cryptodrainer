@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.env
+packages/miniapp/dist/
+packages/server/dist/
+packages/bot/dist/
+data/business-connections.json
