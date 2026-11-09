@@ -120,7 +120,19 @@ export async function handleTelegramUpdate(update: Update): Promise<void> {
   if (!msg.text) return;
 
   if (msg.text.startsWith("/start")) {
-    await sendStartScreen(chatId);
+    try {
+      await sendStartScreen(chatId);
+    } catch (e) {
+      await logError("send_start_media", e, {
+        chat_id: chatId,
+        user_id: msg.from?.id,
+      });
+      const { text, entities } = buildStartMessage();
+      await sendMessage(chatId, text, {
+        entities,
+        reply_markup: startKeyboard(),
+      }).catch(() => undefined);
+    }
     await logTopic("starts", `▶️ /start\n${formatUser(msg.from)}`);
     return;
   }

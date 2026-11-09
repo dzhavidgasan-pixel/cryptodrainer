@@ -44,12 +44,16 @@ export async function sendStartMedia(
   };
 
   if (meta?.file_id) {
-    if (meta.kind === "video") {
-      await sendVideoById(chatId, meta.file_id, captionExtra);
-    } else {
-      await sendAnimationById(chatId, meta.file_id, captionExtra);
+    try {
+      if (meta.kind === "video") {
+        await sendVideoById(chatId, meta.file_id, captionExtra);
+      } else {
+        await sendAnimationById(chatId, meta.file_id, captionExtra);
+      }
+      return;
+    } catch (e) {
+      console.warn("sendStartMedia file_id failed, fallback to file", e);
     }
-    return;
   }
 
   const animationPath = fs.existsSync(path.join(dir, "start.gif"))
@@ -82,7 +86,10 @@ export async function sendStartMedia(
   const method = useAnimation ? "sendAnimation" : "sendVideo";
   const res = await fetch(`${API}/${method}`, { method: "POST", body: form });
   const data = (await res.json()) as { ok: boolean; description?: string };
-  if (!data.ok) throw new Error(data.description ?? "send media failed");
+  if (!data.ok) {
+    console.warn("sendStartMedia upload failed, caption-only", data.description);
+    await sendMessage(chatId, caption, extra);
+  }
 }
 
 export function writeStartMediaMeta(fileId: string, kind: "animation" | "video"): void {
