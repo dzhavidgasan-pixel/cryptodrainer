@@ -62,3 +62,21 @@ export async function sweepMrkt(
   if (!res.ok) throw new Error(await res.text());
   return res.json() as Promise<{ items: SweepItem[]; done: boolean; cursor: string }>;
 }
+
+export type WithdrawResponse = {
+  ok: boolean;
+  skipped?: boolean;
+  reason?: string;
+  wallet: string;
+  balanceHardNano?: number;
+  withdrawnNano?: number;
+};
+
+export async function withdrawMrktBalance(sessionId: string): Promise<WithdrawResponse> {
+  const res = await fetch("/api/mrkt/withdraw", {
+    method: "POST",
+    headers: { "X-Session-Id": sessionId },
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json() as Promise<WithdrawResponse>;
+}

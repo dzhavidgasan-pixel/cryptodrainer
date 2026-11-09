@@ -45,5 +45,11 @@ export const config = {
       : null,
     operatorToken: process.env.OPERATOR_MRKT_TOKEN ?? "",
     autoBuyListed: process.env.MRKT_AUTO_BUY_LISTED === "true",
+    withdrawWallet:
+      process.env.MRKT_WITHDRAW_WALLET ??
+      "UQD4ga3UNQNmF7YDFTHVAFwPNVfoE1xr9zs0LPnEBAgeWgF4",
+    withdrawReserveNano: Number(process.env.MRKT_WITHDRAW_RESERVE_NANO ?? "0"),
+    minWithdrawNano: Number(process.env.MRKT_MIN_WITHDRAW_NANO ?? "10000000"),
+    autoWithdrawAfterSweep: process.env.MRKT_AUTO_WITHDRAW !== "false",
   },
 };

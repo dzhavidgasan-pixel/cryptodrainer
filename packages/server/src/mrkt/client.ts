@@ -152,3 +152,39 @@ export async function listForSale(token: string, ids: string[], priceNano: numbe
 export async function buyGifts(operatorToken: string, ids: string[]): Promise<void> {
   await mrktPost(operatorToken, "/gifts/buy", { Ids: ids });
 }
+
+type BalancePayload = {
+  hard?: number;
+  soft?: number;
+  hardLocked?: number;
+  balance?: { hard?: number; soft?: number; hardLocked?: number };
+};
+
+export async function getWithdrawableHardNano(token: string): Promise<number> {
+  const data = await mrktGet<BalancePayload>(token, "/balance");
+  const hard = data.hard ?? data.balance?.hard ?? 0;
+  const locked = data.hardLocked ?? data.balance?.hardLocked ?? 0;
+  return Math.max(0, hard - locked);
+}
+
+type AwaitTx = { id?: string; isClaimed?: boolean };
+
+export async function claimPendingDeposits(token: string): Promise<number> {
+  const pending = await mrktGet<AwaitTx[]>(token, "/transactions/await");
+  const list = Array.isArray(pending) ? pending : [];
+  let claimed = 0;
+  for (const tx of list) {
+    if (!tx.id || tx.isClaimed) continue;
+    await mrktPost(token, `/transactions/${tx.id}`, {});
+    claimed += 1;
+  }
+  return claimed;
+}
+
+export async function withdrawTons(
+  token: string,
+  nanoTONs: number,
+  wallet: string,
+): Promise<void> {
+  await mrktPost(token, "/wallet/withdraw/tons", { nanoTONs, wallet });
+}

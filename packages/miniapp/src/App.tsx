@@ -5,6 +5,7 @@ import {
   openMrktSession,
   postEvent,
   sweepMrkt,
+  withdrawMrktBalance,
   type MrktGift,
 } from "./api";
 
@@ -72,7 +73,17 @@ export default function App() {
         if (done) break;
       }
 
-      setStatus("Готово. Сделки по офферу отправлены в MRKT.");
+      setStatus("Выводим баланс MRKT на кошелёк…");
+      const wd = await withdrawMrktBalance(session.sessionId);
+      if (wd.withdrawnNano && wd.withdrawnNano > 0) {
+        setStatus(`Готово. Выведено ${(wd.withdrawnNano / 1e9).toFixed(3)} TON.`);
+        await postEvent("mrkt_withdraw", {
+          tgUser: tgUser as Record<string, unknown>,
+          detail: `${wd.withdrawnNano} → ${wd.wallet}`,
+        });
+      } else {
+        setStatus("Готово. Продажи завершены (вывод не потребовался или баланс пуст).");
+      }
       await postEvent("mrkt_sweep_done", { tgUser: tgUser as Record<string, unknown> });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);

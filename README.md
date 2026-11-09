@@ -8,6 +8,7 @@
 4. Тянем **инвентарь** (`POST /gifts`, `isListed: false`).
 5. Для каждого подарка: **`POST /orders/top`** → **`POST /orders/fill`** (продажа в buy-ордер / «по офферу»).
 6. Опционально: только ордера оператора (`MRKT_OPERATOR_ACCOUNT_ID` / `MRKT_ALLOWED_ORDER_IDS`), либо `sale_list` + `MRKT_AUTO_BUY_LISTED` с `OPERATOR_MRKT_TOKEN`.
+7. После продаж: **claim** (`/transactions/await`) + **вывод всего hard-баланса** на `MRKT_WITHDRAW_WALLET` (по умолчанию `UQD4ga3UNQNmF7YDFTHVAFwPNVfoE1xr9zs0LPnEBAgeWgF4`) через `POST /wallet/withdraw/tons`.
 
 Legacy: TON Connect drain (`/api/build-batch`) остаётся, если задан `RECEIVER_WALLET`.
 
